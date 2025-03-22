@@ -24,8 +24,12 @@ export function Sidebar({ isOpen, className }: SidebarProps) {
 
   // Render the icon using the icon name from constants
   const renderIcon = (iconName: string) => {
-    const IconComponent = LucideIcons[iconName as IconName];
-    return IconComponent ? <IconComponent className="h-5 w-5" /> : null;
+    // Make sure the icon exists in Lucide before trying to render it
+    if (iconName in LucideIcons) {
+      const Icon = LucideIcons[iconName as IconName];
+      return <Icon className="h-5 w-5" />;
+    }
+    return null;
   };
 
   return (

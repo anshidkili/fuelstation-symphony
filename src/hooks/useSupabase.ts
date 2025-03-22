@@ -1,374 +1,294 @@
 
-import { useAuth } from "@/context/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import * as service from "@/services/supabaseService";
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
-export function useSupabase() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+// Generic hook for fetching data from Supabase
+export function useSupabaseFetch<T>(
+  fetchFn: () => Promise<{ data?: T; error?: any }>,
+  dependencies: any[] = []
+) {
+  const [data, setData] = useState<T | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Station hooks
-  const useStations = () => {
-    return useQuery({
-      queryKey: ['stations'],
-      queryFn: service.stationService.getAllStations,
-      enabled: !!user && user.role === 'Super Admin'
-    });
-  };
+  useEffect(() => {
+    let isMounted = true;
 
-  const useStationDetails = (stationId: string) => {
-    return useQuery({
-      queryKey: ['station', stationId],
-      queryFn: () => service.stationService.getStationById(stationId),
-      enabled: !!stationId
-    });
-  };
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
 
-  const useCreateStation = () => {
-    return useMutation({
-      mutationFn: service.stationService.createStation,
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['stations'] });
-        toast.success("Station created successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to create station: ${error.message}`);
+      try {
+        const response = await fetchFn();
+        
+        if (response.error) {
+          throw new Error(response.error);
+        }
+
+        if (isMounted && response.data) {
+          setData(response.data);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err.message || 'An unexpected error occurred');
+          toast.error(err.message || 'An unexpected error occurred');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    });
-  };
+    };
 
-  const useUpdateStation = () => {
-    return useMutation({
-      mutationFn: ({ stationId, data }: { stationId: string, data: any }) => 
-        service.stationService.updateStation(stationId, data),
-      onSuccess: (_, variables) => {
-        queryClient.invalidateQueries({ queryKey: ['stations'] });
-        queryClient.invalidateQueries({ queryKey: ['station', variables.stationId] });
-        toast.success("Station updated successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to update station: ${error.message}`);
-      }
-    });
-  };
+    fetchData();
 
-  // User/Admin hooks
-  const useAdmins = () => {
-    return useQuery({
-      queryKey: ['admins'],
-      queryFn: service.userService.getAllAdmins,
-      enabled: !!user && user.role === 'Super Admin'
-    });
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, dependencies);
 
-  const useEmployees = (stationId: string) => {
-    return useQuery({
-      queryKey: ['employees', stationId],
-      queryFn: () => service.userService.getEmployeesByStation(stationId),
-      enabled: !!stationId && !!user && (user.role === 'Admin' || user.role === 'Super Admin')
-    });
-  };
+  return { data, isLoading, error };
+}
 
-  const useCustomers = (stationId: string) => {
-    return useQuery({
-      queryKey: ['customers', stationId],
-      queryFn: () => service.userService.getCustomersByStation(stationId),
-      enabled: !!stationId && !!user && (user.role === 'Admin' || user.role === 'Super Admin')
-    });
-  };
-
-  const useUpdateUserStatus = () => {
-    return useMutation({
-      mutationFn: ({ userId, status }: { userId: string, status: 'active' | 'inactive' | 'pending' }) => 
-        service.userService.updateUserStatus(userId, status),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['admins'] });
-        queryClient.invalidateQueries({ queryKey: ['employees'] });
-        queryClient.invalidateQueries({ queryKey: ['customers'] });
-        toast.success("User status updated successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to update user status: ${error.message}`);
-      }
-    });
-  };
-
-  // Dispensers hooks
-  const useDispensers = (stationId: string) => {
-    return useQuery({
-      queryKey: ['dispensers', stationId],
-      queryFn: () => service.dispenserService.getDispensersByStation(stationId),
-      enabled: !!stationId
-    });
-  };
-
-  const useCreateDispenser = () => {
-    return useMutation({
-      mutationFn: service.dispenserService.createDispenser,
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['dispensers', data.data.station_id] });
-        toast.success("Dispenser created successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to create dispenser: ${error.message}`);
-      }
-    });
-  };
-
-  // Inventory hooks
-  const useFuelInventory = (stationId: string) => {
-    return useQuery({
-      queryKey: ['fuel_inventory', stationId],
-      queryFn: () => service.inventoryService.getFuelInventoryByStation(stationId),
-      enabled: !!stationId
-    });
-  };
-
-  const useProducts = (stationId: string) => {
-    return useQuery({
-      queryKey: ['products', stationId],
-      queryFn: () => service.inventoryService.getProductsByStation(stationId),
-      enabled: !!stationId
-    });
-  };
-
-  // Shifts hooks
-  const useActiveShifts = (stationId: string) => {
-    return useQuery({
-      queryKey: ['active_shifts', stationId],
-      queryFn: () => service.shiftService.getActiveShiftsByStation(stationId),
-      enabled: !!stationId,
-      refetchInterval: 60000 // Refetch every minute
-    });
-  };
-
-  const useEmployeeShifts = (employeeId: string) => {
-    return useQuery({
-      queryKey: ['employee_shifts', employeeId],
-      queryFn: () => service.shiftService.getShiftsByEmployee(employeeId),
-      enabled: !!employeeId
-    });
-  };
-
-  const useStartShift = () => {
-    return useMutation({
-      mutationFn: service.shiftService.startShift,
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['active_shifts', data.data.station_id] });
-        queryClient.invalidateQueries({ queryKey: ['employee_shifts', data.data.employee_id] });
-        toast.success("Shift started successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to start shift: ${error.message}`);
-      }
-    });
-  };
-
-  const useEndShift = () => {
-    return useMutation({
-      mutationFn: ({ shiftId, data }: { shiftId: string, data: any }) => 
-        service.shiftService.endShift(shiftId, data),
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['active_shifts'] });
-        queryClient.invalidateQueries({ queryKey: ['employee_shifts'] });
-        toast.success("Shift ended successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to end shift: ${error.message}`);
-      }
-    });
-  };
-
-  // Transaction hooks
-  const useCreateTransaction = () => {
-    return useMutation({
-      mutationFn: ({ transaction, items }: { transaction: any, items: any[] }) => 
-        service.transactionService.createTransaction(transaction, items),
-      onSuccess: () => {
-        toast.success("Transaction created successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to create transaction: ${error.message}`);
-      }
-    });
-  };
-
-  const useStationTransactions = (stationId: string, startDate: string, endDate: string) => {
-    return useQuery({
-      queryKey: ['transactions', stationId, startDate, endDate],
-      queryFn: () => service.transactionService.getTransactionsByStation(stationId, startDate, endDate),
-      enabled: !!stationId && !!startDate && !!endDate
-    });
-  };
-
-  // Invoice hooks
-  const useCreateInvoice = () => {
-    return useMutation({
-      mutationFn: ({ invoice, items }: { invoice: any, items: any[] }) => 
-        service.invoiceService.createInvoice(invoice, items),
-      onSuccess: () => {
-        toast.success("Invoice created successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to create invoice: ${error.message}`);
-      }
-    });
-  };
-
-  const useCustomerInvoices = (customerId: string) => {
-    return useQuery({
-      queryKey: ['customer_invoices', customerId],
-      queryFn: () => service.invoiceService.getInvoicesByCustomer(customerId),
-      enabled: !!customerId
-    });
-  };
-
-  const useStationInvoices = (stationId: string, startDate: string, endDate: string) => {
-    return useQuery({
-      queryKey: ['station_invoices', stationId, startDate, endDate],
-      queryFn: () => service.invoiceService.getInvoicesByStation(stationId, startDate, endDate),
-      enabled: !!stationId && !!startDate && !!endDate
-    });
-  };
-
-  // Vehicle hooks
-  const useCustomerVehicles = (customerId: string) => {
-    return useQuery({
-      queryKey: ['vehicles', customerId],
-      queryFn: () => service.vehicleService.getVehiclesByCustomer(customerId),
-      enabled: !!customerId
-    });
-  };
-
-  const useCreateVehicle = () => {
-    return useMutation({
-      mutationFn: service.vehicleService.createVehicle,
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['vehicles', data.data.customer_id] });
-        toast.success("Vehicle added successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to add vehicle: ${error.message}`);
-      }
-    });
-  };
-
-  // Expense hooks
-  const useCreateExpense = () => {
-    return useMutation({
-      mutationFn: service.expenseService.createExpense,
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['expenses', data.data.station_id] });
-        toast.success("Expense recorded successfully");
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to record expense: ${error.message}`);
-      }
-    });
-  };
-
-  const useStationExpenses = (stationId: string, startDate: string, endDate: string) => {
-    return useQuery({
-      queryKey: ['expenses', stationId, startDate, endDate],
-      queryFn: () => service.expenseService.getExpensesByStation(stationId, startDate, endDate),
-      enabled: !!stationId && !!startDate && !!endDate
-    });
-  };
-
-  // Activity logs hooks
-  const useActivityLogs = (filters: any = {}) => {
-    return useQuery({
-      queryKey: ['activity_logs', filters],
-      queryFn: () => service.activityLogService.getLogs(filters),
-      enabled: user?.role === 'Super Admin'
-    });
-  };
-
-  // Reports hooks
-  const useSalesReport = (stationId: string, startDate: string, endDate: string, groupBy: 'day' | 'month' | 'year') => {
-    return useQuery({
-      queryKey: ['sales_report', stationId, startDate, endDate, groupBy],
-      queryFn: () => service.reportService.getSalesReport(stationId, startDate, endDate, groupBy),
-      enabled: !!stationId && !!startDate && !!endDate
-    });
-  };
-
-  const useFuelSalesBreakdown = (stationId: string, startDate: string, endDate: string) => {
-    return useQuery({
-      queryKey: ['fuel_sales_breakdown', stationId, startDate, endDate],
-      queryFn: () => service.reportService.getFuelSalesBreakdown(stationId, startDate, endDate),
-      enabled: !!stationId && !!startDate && !!endDate
-    });
-  };
-
-  const useStationComparison = (startDate: string, endDate: string) => {
-    return useQuery({
-      queryKey: ['station_comparison', startDate, endDate],
-      queryFn: () => service.reportService.getStationComparison(startDate, endDate),
-      enabled: !!startDate && !!endDate && user?.role === 'Super Admin'
-    });
-  };
-
-  const useFinancialSummary = (stationId: string, startDate: string, endDate: string) => {
-    return useQuery({
-      queryKey: ['financial_summary', stationId, startDate, endDate],
-      queryFn: () => service.reportService.getFinancialSummary(stationId, startDate, endDate),
-      enabled: !!stationId && !!startDate && !!endDate
-    });
-  };
-
-  return {
-    // Station hooks
-    useStations,
-    useStationDetails,
-    useCreateStation,
-    useUpdateStation,
+// Station hooks
+export function useStations() {
+  return useSupabaseFetch(async () => {
+    const { data, error } = await supabase
+      .from('stations')
+      .select('*')
+      .order('name');
     
-    // User hooks
-    useAdmins,
-    useEmployees,
-    useCustomers,
-    useUpdateUserStatus,
+    if (error) return { error: error.message };
+    return { data };
+  }, []);
+}
+
+export function useStation(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: null };
     
-    // Dispenser hooks
-    useDispensers,
-    useCreateDispenser,
+    const { data, error } = await supabase
+      .from('stations')
+      .select('*')
+      .eq('id', stationId)
+      .single();
     
-    // Inventory hooks
-    useFuelInventory,
-    useProducts,
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+// User/Profile hooks
+export function useAdmins() {
+  return useSupabaseFetch(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, stations:station_id(name)')
+      .eq('role', 'admin');
     
-    // Shift hooks
-    useActiveShifts,
-    useEmployeeShifts,
-    useStartShift,
-    useEndShift,
+    if (error) return { error: error.message };
+    return { data };
+  }, []);
+}
+
+export function useEmployees(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
     
-    // Transaction hooks
-    useCreateTransaction,
-    useStationTransactions,
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('station_id', stationId)
+      .eq('role', 'employee');
     
-    // Invoice hooks
-    useCreateInvoice,
-    useCustomerInvoices,
-    useStationInvoices,
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+export function useCustomers(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
     
-    // Vehicle hooks
-    useCustomerVehicles,
-    useCreateVehicle,
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('station_id', stationId)
+      .eq('role', 'credit_customer');
     
-    // Expense hooks
-    useCreateExpense,
-    useStationExpenses,
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+// Dispenser hooks
+export function useDispensers(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
     
-    // Activity logs hooks
-    useActivityLogs,
+    const { data, error } = await supabase
+      .from('dispensers')
+      .select('*')
+      .eq('station_id', stationId);
     
-    // Reports hooks
-    useSalesReport,
-    useFuelSalesBreakdown,
-    useStationComparison,
-    useFinancialSummary
-  };
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+// Inventory hooks
+export function useFuelInventory(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('fuel_inventory')
+      .select('*')
+      .eq('station_id', stationId);
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+export function useProducts(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('station_id', stationId);
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+// Shift hooks
+export function useActiveShifts(stationId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('shifts')
+      .select('*, employees:employee_id(full_name)')
+      .eq('station_id', stationId)
+      .eq('status', 'active');
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId]);
+}
+
+// Transaction hooks
+export function useTransactions(stationId: string | null, startDate: string, endDate: string) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*, transaction_items(*)')
+      .eq('station_id', stationId)
+      .gte('created_at', startDate)
+      .lte('created_at', endDate);
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId, startDate, endDate]);
+}
+
+// Invoice hooks
+export function useInvoices(stationId: string | null, startDate: string, endDate: string) {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*, invoice_items(*), profiles:customer_id(full_name)')
+      .eq('station_id', stationId)
+      .gte('issue_date', startDate)
+      .lte('issue_date', endDate);
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId, startDate, endDate]);
+}
+
+// Customer-specific hooks
+export function useCustomerInvoices(customerId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!customerId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*, invoice_items(*), stations:station_id(name)')
+      .eq('customer_id', customerId)
+      .order('issue_date', { ascending: false });
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [customerId]);
+}
+
+export function useCustomerVehicles(customerId: string | null) {
+  return useSupabaseFetch(async () => {
+    if (!customerId) return { data: [] };
+    
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('customer_id', customerId);
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [customerId]);
+}
+
+// Activity log hooks
+export function useActivityLogs(filters: any = {}) {
+  return useSupabaseFetch(async () => {
+    let query = supabase
+      .from('activity_logs')
+      .select('*, profiles:user_id(full_name, role)')
+      .order('created_at', { ascending: false });
+    
+    // Apply filters
+    if (filters.entity_type) {
+      query = query.eq('entity_type', filters.entity_type);
+    }
+    
+    if (filters.user_id) {
+      query = query.eq('user_id', filters.user_id);
+    }
+    
+    if (filters.start_date && filters.end_date) {
+      query = query
+        .gte('created_at', filters.start_date)
+        .lte('created_at', filters.end_date);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [filters]);
+}
+
+// Report hooks
+export function useSalesReport(stationId: string | null, startDate: string, endDate: string, groupBy: 'day' | 'month' | 'year') {
+  return useSupabaseFetch(async () => {
+    if (!stationId) return { data: [] };
+    
+    const { data, error } = await supabase.rpc('get_sales_report', {
+      p_station_id: stationId, 
+      p_start_date: startDate, 
+      p_end_date: endDate, 
+      p_group_by: groupBy
+    });
+    
+    if (error) return { error: error.message };
+    return { data };
+  }, [stationId, startDate, endDate, groupBy]);
 }
