@@ -3,6 +3,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole } from '@/lib/constants';
 import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
 
 interface User {
   id: string;
@@ -39,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Get user profile data
             const { data: profile, error: profileError } = await supabase
               .from('profiles')
-              .select('*, stations:station_id(name)')
+              .select('*, stations:station_id(*)')
               .eq('user_id', currentSession.user.id)
               .single();
 
@@ -90,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get user profile data
         supabase
           .from('profiles')
-          .select('*, stations:station_id(name)')
+          .select('*, stations:station_id(*)')
           .eq('user_id', currentSession.user.id)
           .single()
           .then(({ data: profile, error: profileError }) => {

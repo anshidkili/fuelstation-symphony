@@ -1,55 +1,35 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface SupabaseInitializerProps {
-  children: React.ReactNode;
-}
-
-export function SupabaseInitializer({ children }: SupabaseInitializerProps) {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const SupabaseInitializer = () => {
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const checkSupabase = async () => {
+    const initializeSupabase = async () => {
       try {
-        // Simple check to see if we can connect to Supabase
-        const { error } = await supabase.from('stations').select('count', { count: 'exact', head: true });
+        // Check connection by making a simple query
+        const { error } = await supabase.from('profiles').select('count').limit(1);
         
         if (error) {
-          throw new Error(`Failed to connect to Supabase: ${error.message}`);
+          console.error('Supabase initialization error:', error);
+          toast.error('Failed to connect to the database');
+          return;
         }
-        
-        console.log('Successfully connected to Supabase');
-        setIsInitialized(true);
-      } catch (err: any) {
-        console.error('Supabase initialization error:', err);
-        toast.error("Could not connect to the database. Using mock data for development.");
-        setError(err.message);
-        // Continue anyway, to allow the app to work with mock data
-        setIsInitialized(true);
+
+        setInitialized(true);
+        console.log('Supabase connection initialized successfully');
+      } catch (error) {
+        console.error('Supabase initialization error:', error);
+        toast.error('Failed to connect to the database');
       }
     };
 
-    checkSupabase();
+    initializeSupabase();
   }, []);
 
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Connecting to database...</p>
-        </div>
-      </div>
-    );
-  }
+  return null; // This is a utility component, no UI rendering needed
+};
 
-  if (error) {
-    console.warn('Using mock data due to Supabase connection error');
-  }
-
-  return <>{children}</>;
-}
+export default SupabaseInitializer;
