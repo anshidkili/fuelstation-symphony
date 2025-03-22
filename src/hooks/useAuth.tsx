@@ -3,6 +3,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole } from '@/lib/constants';
 import { toast } from 'sonner';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
 interface User {
@@ -16,7 +17,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  session: any;
+  session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -26,7 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -40,7 +41,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Get user profile data
             const { data: profile, error: profileError } = await supabase
               .from('profiles')
-              .select('*, stations:station_id(*)')
+              .select(`
+                *,
+                stations:station_id (
+                  name
+                )
+              `)
               .eq('user_id', currentSession.user.id)
               .single();
 
@@ -91,7 +97,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get user profile data
         supabase
           .from('profiles')
-          .select('*, stations:station_id(*)')
+          .select(`
+            *,
+            stations:station_id (
+              name
+            )
+          `)
           .eq('user_id', currentSession.user.id)
           .single()
           .then(({ data: profile, error: profileError }) => {

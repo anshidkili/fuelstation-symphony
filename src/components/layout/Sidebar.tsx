@@ -1,88 +1,79 @@
 
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useNavigate, useLocation } from "react-router-dom";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/context/AuthContext";
 import { SIDEBAR_ITEMS } from "@/lib/constants";
-import * as LucideIcons from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import * as Icons from "lucide-react";
+import { UserRole } from "@/lib/constants";
 
-type IconName = keyof typeof LucideIcons;
+type IconName = keyof typeof Icons;
 
 interface SidebarProps {
   isOpen: boolean;
-  className?: string;
 }
 
-export function Sidebar({ isOpen, className }: SidebarProps) {
+export function Sidebar({ isOpen }: SidebarProps) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
-
+  
   if (!user) return null;
 
-  const items = SIDEBAR_ITEMS[user.role] || [];
+  const userRole = user.role as UserRole;
+  const menuItems = SIDEBAR_ITEMS[userRole] || [];
 
-  // Render the icon using the icon name from constants
   const renderIcon = (iconName: string) => {
-    // Make sure the icon exists in Lucide before trying to render it
-    if (iconName in LucideIcons) {
-      const IconComponent = LucideIcons[iconName as IconName];
-      return <IconComponent className="h-5 w-5" />;
-    }
-    return null;
+    const IconComponent = Icons[iconName as IconName];
+    return IconComponent ? <IconComponent className="h-4 w-4" /> : null;
   };
 
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-20 flex h-full w-64 flex-col border-r bg-sidebar transition-all duration-300 ease-in-out",
-        isOpen ? "translate-x-0" : "-translate-x-full",
-        "md:relative md:translate-x-0",
-        className
+        "fixed inset-y-0 left-0 z-20 flex h-full flex-col border-r bg-card/80 backdrop-blur-sm transition-transform duration-300 md:relative md:transition-none",
+        isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0", 
+        "w-64 shrink-0"
       )}
     >
-      <div className="flex h-16 items-center border-b px-6">
-        <div className="font-display text-xl font-bold tracking-tight">
-          Fuel Symphony
-        </div>
+      <div className="border-b px-4 py-4">
+        <h2 className="text-lg font-semibold tracking-tight">Fuel Symphony</h2>
+        <p className="text-sm text-muted-foreground">
+          {userRole === UserRole.SUPER_ADMIN 
+            ? "Super Admin Console" 
+            : userRole === UserRole.ADMIN 
+            ? user.station_name || "Station Manager" 
+            : userRole === UserRole.EMPLOYEE 
+            ? "Employee Portal" 
+            : "Customer Portal"}
+        </p>
       </div>
 
-      <div className="flex-1 overflow-auto py-4 px-3">
-        <div className="mb-4 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Menu
-        </div>
-        <nav className="space-y-1">
-          {items.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Button
-                key={item.path}
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start px-3 py-2 text-sm font-medium transition-all",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-                onClick={() => navigate(item.path)}
-              >
-                {renderIcon(item.icon)}
-                <span className="ml-3">{item.label}</span>
-              </Button>
-            );
-          })}
+      <ScrollArea className="flex-1 overflow-auto">
+        <nav className="grid items-start px-2 py-4">
+          {menuItems.map((item, index) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                "group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent",
+                location.pathname === item.path ? "bg-accent text-accent-foreground" : "transparent"
+              )}
+            >
+              {renderIcon(item.icon)}
+              <span className="ml-3">{item.label}</span>
+            </Link>
+          ))}
         </nav>
-      </div>
-
-      <div className="border-t border-border p-4">
-        <div className="text-xs text-muted-foreground">
-          <div className="mb-1 font-medium text-foreground">{user.role}</div>
-          {user.station_name && (
-            <div className="mb-2">{user.station_name}</div>
-          )}
-          <div>© {new Date().getFullYear()} Fuel Symphony</div>
+        
+        <Separator className="my-2" />
+        
+        <div className="px-3 py-2">
+          <p className="text-xs text-muted-foreground opacity-50">
+            © 2024 Fuel Symphony v1.0
+          </p>
         </div>
-      </div>
+      </ScrollArea>
     </aside>
   );
 }
