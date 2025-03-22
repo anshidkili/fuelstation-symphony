@@ -1,7 +1,8 @@
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SupabaseInitializerProps {
   children: React.ReactNode;
@@ -21,9 +22,11 @@ export function SupabaseInitializer({ children }: SupabaseInitializerProps) {
           throw new Error(`Failed to connect to Supabase: ${error.message}`);
         }
         
+        console.log('Successfully connected to Supabase');
         setIsInitialized(true);
       } catch (err: any) {
         console.error('Supabase initialization error:', err);
+        toast.error("Could not connect to the database. Using mock data for development.");
         setError(err.message);
         // Continue anyway, to allow the app to work with mock data
         setIsInitialized(true);
