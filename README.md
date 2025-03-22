@@ -1,69 +1,69 @@
-# Welcome to your Lovable project
 
-## Project info
+# Fuel Symphony - Fuel Station Management System
 
-**URL**: https://lovable.dev/projects/7caf1c4c-5e28-468e-af22-cf048954962b
+This is a comprehensive management system for fuel stations, supporting multiple user roles and functionalities.
 
-## How can I edit this code?
+## Setting Up Supabase Database
 
-There are several ways of editing your application.
+1. Create a new Supabase project
+2. Go to the SQL Editor in your Supabase dashboard
+3. Copy and paste the SQL from `supabase_schema.sql` into a new query
+4. Run the query to set up all tables, functions, and security policies
+5. Create your first Super Admin user through the Supabase Auth UI or API
 
-**Use Lovable**
+## Environment Variables
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/7caf1c4c-5e28-468e-af22-cf048954962b) and start prompting.
+Create a `.env` file in the root of your project with the following variables:
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-**Edit a file directly in GitHub**
+Replace `your_supabase_url` and `your_supabase_anon_key` with your actual Supabase project URL and anon key.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Running the Application
 
-**Use GitHub Codespaces**
+1. Install dependencies:
+   ```
+   npm install
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+2. Start the development server:
+   ```
+   npm run dev
+   ```
 
-## What technologies are used for this project?
+## User Roles
 
-This project is built with .
+- **Super Admin**: Manages all stations and admins, views system-wide reports
+- **Admin**: Manages a specific station, employees, inventory, and finances
+- **Employee**: Handles daily operations and sales
+- **Credit Customer**: Views invoices and vehicle consumption
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Demo Login Credentials
 
-## How can I deploy this project?
+For testing purposes, the following demo accounts are available:
 
-Simply open [Lovable](https://lovable.dev/projects/7caf1c4c-5e28-468e-af22-cf048954962b) and click on Share -> Publish.
+- **Super Admin**: superadmin@fuelstation.com / password
+- **Admin**: admin@fuelstation.com / password
+- **Employee**: employee@fuelstation.com / password
+- **Credit Customer**: customer@company.com / password
 
-## I want to use a custom domain - is that possible?
+Note: These credentials work even when Supabase is not connected, to facilitate development and testing.
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+## Features
+
+- Real-time dashboard for each user role
+- Complete station management
+- Employee shift tracking
+- Dispenser and fuel inventory management
+- Sales and transaction tracking
+- Invoice generation and management
+- Financial reporting and analytics
+- Credit customer management
+- Vehicle tracking and fuel consumption analytics
+
+## License
+
+© 2023 Fuel Symphony. All rights reserved.

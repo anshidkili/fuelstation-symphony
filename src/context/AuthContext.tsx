@@ -2,9 +2,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from "sonner";
 import { UserRole } from '@/lib/constants';
+import { supabase, handleSupabaseError, Profile } from '@/lib/supabase';
 
-// This is a temporary mock for Supabase auth
-// In the real implementation, this would use Supabase authentication
+// User interface enhanced with Supabase
 interface User {
   id: string;
   email: string;
@@ -23,7 +23,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock data - this would come from Supabase
+// This is the fallback mock data - used when Supabase connection fails
 const MOCK_USERS = [
   {
     id: "1",
@@ -65,34 +65,131 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Check if user is already authenticated on load
   useEffect(() => {
-    // Check if there's a stored user session
-    const storedUser = localStorage.getItem('fs_user');
-    if (storedUser) {
+    async function checkAuth() {
+      setIsLoading(true);
       try {
-        setUser(JSON.parse(storedUser));
+        // Get current session from Supabase
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        if (session?.user) {
+          // Get user profile data
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*, stations:station_id(name)')
+            .eq('user_id', session.user.id)
+            .single();
+
+          if (profileError) {
+            throw profileError;
+          }
+
+          if (profile) {
+            // Create user object from profile data
+            const userData: User = {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: profile.full_name,
+              role: profile.role as UserRole,
+              station_id: profile.station_id,
+              station_name: profile.stations?.name
+            };
+            
+            setUser(userData);
+            localStorage.setItem('fs_user', JSON.stringify(userData));
+          }
+        } else {
+          // Check for stored user in localStorage (fallback)
+          const storedUser = localStorage.getItem('fs_user');
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch (error) {
+              console.error("Failed to parse stored user", error);
+              localStorage.removeItem('fs_user');
+            }
+          }
+        }
       } catch (error) {
-        console.error("Failed to parse stored user", error);
-        localStorage.removeItem('fs_user');
+        console.error("Auth check error:", error);
+        // Fallback to localStorage if Supabase session check fails
+        const storedUser = localStorage.getItem('fs_user');
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (error) {
+            console.error("Failed to parse stored user", error);
+            localStorage.removeItem('fs_user');
+          }
+        }
+      } finally {
+        setIsLoading(false);
       }
     }
-    setIsLoading(false);
+
+    checkAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     setIsLoading(true);
     
     try {
-      // Mock authentication - will be replaced with Supabase auth
-      const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
-      
-      if (foundUser) {
-        const { password, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword);
-        localStorage.setItem('fs_user', JSON.stringify(userWithoutPassword));
-        toast.success(`Welcome back, ${userWithoutPassword.name}!`);
-      } else {
-        toast.error("Invalid email or password");
+      // Try to sign in with Supabase
+      const { data: { session }, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        // If Supabase auth fails, fallback to mock data (for demo purposes)
+        console.warn("Supabase auth failed, using mock data:", authError.message);
+        const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
+        
+        if (foundUser) {
+          const { password, ...userWithoutPassword } = foundUser;
+          setUser(userWithoutPassword);
+          localStorage.setItem('fs_user', JSON.stringify(userWithoutPassword));
+          toast.success(`Welcome back, ${userWithoutPassword.name}!`);
+        } else {
+          toast.error("Invalid email or password");
+        }
+        return;
+      }
+
+      if (session) {
+        // Get user profile data
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*, stations:station_id(name)')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        if (profile) {
+          // Create user object from profile data
+          const userData: User = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: profile.full_name,
+            role: profile.role as UserRole,
+            station_id: profile.station_id,
+            station_name: profile.stations?.name
+          };
+          
+          setUser(userData);
+          localStorage.setItem('fs_user', JSON.stringify(userData));
+          toast.success(`Welcome back, ${userData.name}!`);
+        } else {
+          toast.error("User profile not found");
+        }
       }
     } catch (error) {
       console.error("Sign in error:", error);
@@ -105,7 +202,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     setIsLoading(true);
     try {
-      // Mock logout - will be replaced with Supabase auth
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Clear local storage and state
       setUser(null);
       localStorage.removeItem('fs_user');
       toast.success("You have been signed out successfully");

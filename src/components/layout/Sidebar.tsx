@@ -24,8 +24,8 @@ export function Sidebar({ isOpen, className }: SidebarProps) {
 
   // Render the icon using the icon name from constants
   const renderIcon = (iconName: string) => {
-    const Icon = LucideIcons[iconName as IconName];
-    return Icon ? <Icon className="h-5 w-5" /> : null;
+    const IconComponent = LucideIcons[iconName as IconName];
+    return IconComponent ? <IconComponent className="h-5 w-5" /> : null;
   };
 
   return (

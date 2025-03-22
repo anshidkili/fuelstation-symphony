@@ -2,6 +2,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { UserRole } from "@/lib/constants";
 import { StatsCard } from "@/components/dashboard/StatsCard";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
