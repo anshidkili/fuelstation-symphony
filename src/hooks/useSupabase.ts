@@ -54,7 +54,7 @@ export function useSupabaseFetch<T>(
 
 // Station hooks
 export function useStations() {
-  return useSupabaseFetch(async () => {
+  return useSupabaseFetch<any[]>(async () => {
     return await supabase
       .from('stations')
       .select('*')
@@ -63,7 +63,7 @@ export function useStations() {
 }
 
 export function useStation(stationId: string | null) {
-  return useSupabaseFetch(async () => {
+  return useSupabaseFetch<any>(async () => {
     if (!stationId) {
       return { data: null, error: null } as PostgrestSingleResponse<any>;
     }
@@ -78,7 +78,7 @@ export function useStation(stationId: string | null) {
 
 // Basic function to fetch profiles
 export function useProfiles() {
-  return useSupabaseFetch(async () => {
+  return useSupabaseFetch<any[]>(async () => {
     return await supabase
       .from('profiles')
       .select('*')

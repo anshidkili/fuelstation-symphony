@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
-type User = {
+export type User = {
   id: string;
   full_name: string;
   email: string;
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { data: authData } = await supabase.auth.getSession();
         
         if (authData?.session?.user) {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('profiles')
             .select(`
               id,
@@ -46,9 +46,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               stations:station_id (name)
             `)
             .eq('user_id', authData.session.user.id)
-            .single();
+            .maybeSingle();
 
-          if (data) {
+          if (data && !error) {
             setUser({
               id: data.id,
               full_name: data.full_name,
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('profiles')
             .select(`
               id,
@@ -83,9 +83,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               stations:station_id (name)
             `)
             .eq('user_id', session.user.id)
-            .single();
+            .maybeSingle();
 
-          if (data) {
+          if (data && !error) {
             setUser({
               id: data.id,
               full_name: data.full_name,

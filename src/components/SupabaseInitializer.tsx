@@ -13,10 +13,11 @@ const SupabaseInitializer = ({ children }: { children: React.ReactNode }) => {
         // Check connection by making a simple query
         const { error } = await supabase
           .from('profiles')
-          .select('*', { count: 'exact' })
-          .limit(1);
+          .select('count')
+          .limit(1)
+          .single();
         
-        if (error) {
+        if (error && error.code !== 'PGRST116') {
           console.error('Supabase initialization error:', error);
           setError(error.message);
           toast.error('Failed to connect to the database');
