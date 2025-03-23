@@ -55,51 +55,33 @@ export function useSupabaseFetch<T>(
 // Station hooks
 export function useStations() {
   return useSupabaseFetch<any[]>(async () => {
-    try {
-      const response = await supabase
-        .from('stations')
-        .select('*')
-        .order('name');
-      return response;
-    } catch (error) {
-      console.error('Error fetching stations:', error);
-      return { data: null, error: error as any };
-    }
+    return await supabase
+      .from('stations')
+      .select('*')
+      .order('name');
   }, []);
 }
 
 export function useStation(stationId: string | null) {
   return useSupabaseFetch<any>(async () => {
     if (!stationId) {
-      return { data: null, error: null } as PostgrestSingleResponse<any>;
+      return { data: null, error: null, count: null, status: 200, statusText: 'OK' };
     }
     
-    try {
-      const response = await supabase
-        .from('stations')
-        .select('*')
-        .eq('id', stationId)
-        .single();
-      return response;
-    } catch (error) {
-      console.error('Error fetching station:', error);
-      return { data: null, error: error as any };
-    }
+    return await supabase
+      .from('stations')
+      .select('*')
+      .eq('id', stationId)
+      .single();
   }, [stationId]);
 }
 
 // Basic function to fetch profiles
 export function useProfiles() {
   return useSupabaseFetch<any[]>(async () => {
-    try {
-      const response = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name');
-      return response;
-    } catch (error) {
-      console.error('Error fetching profiles:', error);
-      return { data: null, error: error as any };
-    }
+    return await supabase
+      .from('profiles')
+      .select('*')
+      .order('full_name');
   }, []);
 }

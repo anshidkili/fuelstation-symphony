@@ -51,4 +51,47 @@ export const FUEL_TYPES = [
   { label: "Diesel", value: "diesel", color: "text-amber-500" },
   { label: "Power Fuel", value: "power", color: "text-red-500" },
   { label: "Electric", value: "electric", color: "text-blue-500" },
+  { label: "AdBlue", value: "adblue", color: "text-blue-300" },
+  { label: "LPG", value: "lpg", color: "text-purple-500" },
+];
+
+export const PRODUCT_CATEGORIES = [
+  { label: "Lubricants", value: "lubricants" },
+  { label: "Vehicle Care", value: "vehicle_care" },
+  { label: "Spare Parts", value: "spare_parts" },
+  { label: "Accessories", value: "accessories" },
+  { label: "Snacks", value: "snacks" },
+  { label: "Beverages", value: "beverages" },
+  { label: "Tobacco", value: "tobacco" },
+  { label: "Other", value: "other" }
+];
+
+export const EXPENSE_TYPES = [
+  { label: "Utilities", value: "utilities" },
+  { label: "Maintenance", value: "maintenance" },
+  { label: "Salaries", value: "salaries" },
+  { label: "Rent", value: "rent" },
+  { label: "Supplies", value: "supplies" },
+  { label: "Fuel Purchase", value: "fuel_purchase" },
+  { label: "Product Purchase", value: "product_purchase" },
+  { label: "Taxes", value: "taxes" },
+  { label: "Insurance", value: "insurance" },
+  { label: "Marketing", value: "marketing" },
+  { label: "Bank Deposit", value: "bank_deposit" },
+  { label: "Other", value: "other" }
+];
+
+export const PAYMENT_METHODS = [
+  { label: "Cash", value: "cash" },
+  { label: "Credit Card", value: "credit_card" },
+  { label: "Debit Card", value: "debit_card" },
+  { label: "Mobile Payment", value: "mobile_payment" },
+  { label: "Credit Account", value: "credit" },
+  { label: "Check", value: "check" }
+];
+
+export const TRANSACTION_TYPES = [
+  { label: "Sale", value: "sale" },
+  { label: "Refund", value: "refund" },
+  { label: "Credit", value: "credit" }
 ];

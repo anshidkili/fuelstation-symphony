@@ -8,6 +8,12 @@ import StationsPage from "@/pages/stations/StationsPage";
 import StationForm from "@/pages/stations/StationForm";
 import AdminsPage from "@/pages/admins/AdminsPage";
 import AdminForm from "@/pages/admins/AdminForm";
+import EmployeesPage from "@/pages/employees/EmployeesPage";
+import EmployeeForm from "@/pages/employees/EmployeeForm";
+import DispenserPage from "@/pages/dispensers/DispenserPage";
+import DispenserForm from "@/pages/dispensers/DispenserForm";
+import FuelInventoryPage from "@/pages/inventory/FuelInventoryPage";
+import FuelInventoryForm from "@/pages/inventory/FuelInventoryForm";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +27,7 @@ export const router = createBrowserRouter([
         path: "/",
         element: <DashboardPage />,
       },
+      // Super Admin routes
       {
         path: "/stations",
         element: <StationsPage />,
@@ -44,6 +51,44 @@ export const router = createBrowserRouter([
       {
         path: "/admins/new",
         element: <AdminForm />,
+      },
+      // Admin routes
+      {
+        path: "/employees",
+        element: <EmployeesPage />,
+      },
+      {
+        path: "/employees/:id",
+        element: <EmployeeForm />,
+      },
+      {
+        path: "/employees/new",
+        element: <EmployeeForm />,
+      },
+      {
+        path: "/dispensers",
+        element: <DispenserPage />,
+      },
+      {
+        path: "/dispensers/:id",
+        element: <DispenserForm />,
+      },
+      {
+        path: "/dispensers/new",
+        element: <DispenserForm />,
+      },
+      // Inventory routes
+      {
+        path: "/inventory/fuel",
+        element: <FuelInventoryPage />,
+      },
+      {
+        path: "/inventory/fuel/:id",
+        element: <FuelInventoryForm />,
+      },
+      {
+        path: "/inventory/fuel/new",
+        element: <FuelInventoryForm />,
       },
       // Add more routes as needed
     ],
