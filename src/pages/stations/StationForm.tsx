@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -137,7 +136,9 @@ export default function StationForm() {
 
         toast.success("Station updated successfully");
       } else {
-        const { error } = await supabase.from("stations").insert([data]);
+        const { error } = await supabase
+          .from("stations")
+          .insert(data);
 
         if (error) throw error;
 

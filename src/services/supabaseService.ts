@@ -1,670 +1,481 @@
 
-import { supabase, handleSupabaseError } from '@/lib/supabase';
-import { UserRole } from '@/lib/constants';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
-// Auth services
-export const authService = {
-  getCurrentUser: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) return handleSupabaseError(error);
-    return { data: data.user };
-  },
-
-  signUp: async (email: string, password: string, userData: any) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: userData.name,
-          role: userData.role,
-          station_id: userData.station_id
-        }
-      }
-    });
+// Basic CRUD functions for stations
+export const createStation = async (data: any) => {
+  try {
+    const { data: newStation, error } = await supabase
+      .from('stations')
+      .insert(data)
+      .select()
+      .single();
     
-    if (error) return handleSupabaseError(error);
-    
-    // Create profile record
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: data.user.id,
-          full_name: userData.name,
-          role: userData.role,
-          station_id: userData.station_id,
-          status: userData.role === UserRole.SUPER_ADMIN ? 'active' : 'pending'
-        });
-      
-      if (profileError) return handleSupabaseError(profileError);
-    }
-    
-    return { data };
+    if (error) throw error;
+    return { success: true, data: newStation };
+  } catch (error: any) {
+    toast.error(`Error creating station: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Station services
-export const stationService = {
-  getAllStations: async () => {
-    const { data, error } = await supabase
+export const updateStation = async (id: string, data: any) => {
+  try {
+    const { data: updatedStation, error } = await supabase
       .from('stations')
-      .select('*')
-      .order('name');
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getStationById: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('stations')
-      .select('*')
-      .eq('id', stationId)
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  createStation: async (stationData: any) => {
-    const { data, error } = await supabase
-      .from('stations')
-      .insert(stationData)
+      .update(data)
+      .eq('id', id)
       .select()
       .single();
     
-    if (error) return handleSupabaseError(error);
-    
-    // Create activity log
-    await activityLogService.createLog({
-      action: 'create',
-      entity_type: 'station',
-      entity_id: data.id,
-      details: { name: data.name }
-    });
-    
-    return { data };
-  },
-  
-  updateStation: async (stationId: string, stationData: any) => {
-    const { data, error } = await supabase
-      .from('stations')
-      .update(stationData)
-      .eq('id', stationId)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    
-    // Create activity log
-    await activityLogService.createLog({
-      action: 'update',
-      entity_type: 'station',
-      entity_id: stationId,
-      details: { name: data.name, status: data.status }
-    });
-    
-    return { data };
-  },
-  
-  deleteStation: async (stationId: string) => {
+    if (error) throw error;
+    return { success: true, data: updatedStation };
+  } catch (error: any) {
+    toast.error(`Error updating station: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteStation = async (id: string) => {
+  try {
     const { error } = await supabase
       .from('stations')
       .delete()
-      .eq('id', stationId);
+      .eq('id', id);
     
-    if (error) return handleSupabaseError(error);
-    
-    // Create activity log
-    await activityLogService.createLog({
-      action: 'delete',
-      entity_type: 'station',
-      entity_id: stationId,
-      details: {}
-    });
-    
+    if (error) throw error;
     return { success: true };
+  } catch (error: any) {
+    toast.error(`Error deleting station: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// User/Profile services
-export const userService = {
-  getAllAdmins: async () => {
-    const { data, error } = await supabase
+// Basic CRUD functions for profiles (admins, employees, customers)
+export const createProfile = async (data: any) => {
+  try {
+    const { data: newProfile, error } = await supabase
       .from('profiles')
-      .select('*, stations:station_id(name)')
-      .eq('role', UserRole.ADMIN);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getEmployeesByStation: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('station_id', stationId)
-      .eq('role', UserRole.EMPLOYEE);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getCustomersByStation: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('station_id', stationId)
-      .eq('role', UserRole.CREDIT_CUSTOMER);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateUserStatus: async (userId: string, status: 'active' | 'inactive' | 'pending') => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ status })
-      .eq('user_id', userId)
+      .insert(data)
       .select()
       .single();
     
-    if (error) return handleSupabaseError(error);
+    if (error) throw error;
+    return { success: true, data: newProfile };
+  } catch (error: any) {
+    toast.error(`Error creating profile: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const updateProfile = async (id: string, data: any) => {
+  try {
+    const { data: updatedProfile, error } = await supabase
+      .from('profiles')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
     
-    // Create activity log
-    await activityLogService.createLog({
-      action: 'update_status',
-      entity_type: 'user',
-      entity_id: userId,
-      details: { status }
+    if (error) throw error;
+    return { success: true, data: updatedProfile };
+  } catch (error: any) {
+    toast.error(`Error updating profile: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteProfile = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    toast.error(`Error deleting profile: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+// Basic CRUD functions for dispensers
+export const createDispenser = async (data: any) => {
+  try {
+    const { data: newDispenser, error } = await supabase
+      .from('dispensers')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: newDispenser };
+  } catch (error: any) {
+    toast.error(`Error creating dispenser: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const updateDispenser = async (id: string, data: any) => {
+  try {
+    const { data: updatedDispenser, error } = await supabase
+      .from('dispensers')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: updatedDispenser };
+  } catch (error: any) {
+    toast.error(`Error updating dispenser: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteDispenser = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('dispensers')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    toast.error(`Error deleting dispenser: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+// Fuel inventory functions
+export const updateFuelInventory = async (id: string, data: any) => {
+  try {
+    const { data: updatedInventory, error } = await supabase
+      .from('fuel_inventory')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: updatedInventory };
+  } catch (error: any) {
+    toast.error(`Error updating fuel inventory: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const restockFuel = async (id: string, amount: number) => {
+  try {
+    const { data: inventory, error: fetchError } = await supabase
+      .from('fuel_inventory')
+      .select('current_stock')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const newStock = Number(inventory.current_stock) + Number(amount);
+    
+    const { data: updatedInventory, error } = await supabase
+      .from('fuel_inventory')
+      .update({ current_stock: newStock, updated_at: new Date() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: updatedInventory };
+  } catch (error: any) {
+    toast.error(`Error restocking fuel: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+// Product inventory functions
+export const createProduct = async (data: any) => {
+  try {
+    const { data: newProduct, error } = await supabase
+      .from('products')
+      .insert(data)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: newProduct };
+  } catch (error: any) {
+    toast.error(`Error creating product: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const updateProduct = async (id: string, data: any) => {
+  try {
+    const { data: updatedProduct, error } = await supabase
+      .from('products')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: updatedProduct };
+  } catch (error: any) {
+    toast.error(`Error updating product: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const deleteProduct = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    toast.error(`Error deleting product: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+export const restockProduct = async (id: string, amount: number) => {
+  try {
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('current_stock')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const newStock = Number(product.current_stock) + Number(amount);
+    
+    const { data: updatedProduct, error } = await supabase
+      .from('products')
+      .update({ current_stock: newStock, updated_at: new Date() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { success: true, data: updatedProduct };
+  } catch (error: any) {
+    toast.error(`Error restocking product: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+// Shift management
+export const startShift = async (data: any) => {
+  try {
+    const { data: newShift, error } = await supabase
+      .from('shifts')
+      .insert({
+        station_id: data.station_id,
+        employee_id: data.employee_id,
+        start_time: new Date(),
+        dispensers: data.dispensers,
+        starting_cash: data.starting_cash,
+        status: 'active'
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Insert initial meter readings
+    const meterReadingPromises = data.meter_readings.map((reading: any) => {
+      return supabase
+        .from('meter_readings')
+        .insert({
+          shift_id: newShift.id,
+          dispenser_id: reading.dispenser_id,
+          fuel_type: reading.fuel_type,
+          start_reading: reading.reading,
+          end_reading: null
+        });
     });
     
-    return { data };
+    await Promise.all(meterReadingPromises);
+    
+    return { success: true, data: newShift };
+  } catch (error: any) {
+    toast.error(`Error starting shift: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Dispenser services
-export const dispenserService = {
-  getDispensersByStation: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('dispensers')
-      .select('*')
-      .eq('station_id', stationId);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  createDispenser: async (dispenserData: any) => {
-    const { data, error } = await supabase
-      .from('dispensers')
-      .insert(dispenserData)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateDispenser: async (dispenserId: string, dispenserData: any) => {
-    const { data, error } = await supabase
-      .from('dispensers')
-      .update(dispenserData)
-      .eq('id', dispenserId)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  }
-};
-
-// Inventory services
-export const inventoryService = {
-  getFuelInventoryByStation: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('fuel_inventory')
-      .select('*')
-      .eq('station_id', stationId);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getProductsByStation: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('station_id', stationId);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateFuelInventory: async (inventoryId: string, updates: any) => {
-    const { data, error } = await supabase
-      .from('fuel_inventory')
-      .update(updates)
-      .eq('id', inventoryId)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateProductInventory: async (productId: string, updates: any) => {
-    const { data, error } = await supabase
-      .from('products')
-      .update(updates)
-      .eq('id', productId)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  }
-};
-
-// Shift services
-export const shiftService = {
-  getActiveShiftsByStation: async (stationId: string) => {
-    const { data, error } = await supabase
-      .from('shifts')
-      .select('*, employees:employee_id(full_name)')
-      .eq('station_id', stationId)
-      .eq('status', 'active');
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getShiftsByEmployee: async (employeeId: string) => {
-    const { data, error } = await supabase
-      .from('shifts')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .order('start_time', { ascending: false });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  startShift: async (shiftData: any) => {
-    const { data, error } = await supabase
-      .from('shifts')
-      .insert(shiftData)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  endShift: async (shiftId: string, endData: any) => {
-    const { data, error } = await supabase
+export const endShift = async (id: string, data: any) => {
+  try {
+    const { data: updatedShift, error } = await supabase
       .from('shifts')
       .update({
-        end_time: endData.end_time,
-        ending_cash: endData.ending_cash,
-        status: 'completed',
-        notes: endData.notes
+        end_time: new Date(),
+        ending_cash: data.ending_cash,
+        status: 'completed'
       })
-      .eq('id', shiftId)
+      .eq('id', id)
       .select()
       .single();
     
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  recordMeterReadings: async (readings: any[]) => {
-    const { data, error } = await supabase
-      .from('meter_readings')
-      .insert(readings)
-      .select();
+    if (error) throw error;
     
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateMeterReadings: async (shiftId: string, readings: any[]) => {
-    // Update each meter reading one by one
-    const results = await Promise.all(
-      readings.map(async (reading) => {
-        const { data, error } = await supabase
-          .from('meter_readings')
-          .update({ end_reading: reading.end_reading })
-          .eq('id', reading.id)
-          .select()
-          .single();
-        
-        if (error) return { error };
-        return { data };
-      })
-    );
+    // Update meter readings
+    const meterReadingPromises = data.meter_readings.map((reading: any) => {
+      return supabase
+        .from('meter_readings')
+        .update({
+          end_reading: reading.reading
+        })
+        .eq('id', reading.id);
+    });
     
-    const errors = results.filter(result => result.error);
-    if (errors.length > 0) {
-      return handleSupabaseError(errors[0].error);
-    }
+    await Promise.all(meterReadingPromises);
     
-    return { data: results.map(result => result.data) };
+    return { success: true, data: updatedShift };
+  } catch (error: any) {
+    toast.error(`Error ending shift: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Transaction services
-export const transactionService = {
-  createTransaction: async (transactionData: any, items: any[]) => {
-    // Start a transaction
-    const { data: transaction, error: transactionError } = await supabase
+// Transaction management
+export const createTransaction = async (data: any) => {
+  try {
+    // First create the transaction
+    const { data: newTransaction, error } = await supabase
       .from('transactions')
-      .insert(transactionData)
+      .insert({
+        station_id: data.station_id,
+        shift_id: data.shift_id,
+        customer_id: data.customer_id,
+        transaction_type: data.transaction_type,
+        payment_method: data.payment_method,
+        total_amount: data.total_amount,
+        status: 'completed'
+      })
       .select()
       .single();
     
-    if (transactionError) return handleSupabaseError(transactionError);
+    if (error) throw error;
     
-    // Add transaction items
-    const itemsWithTransactionId = items.map(item => ({
-      ...item,
-      transaction_id: transaction.id
-    }));
+    // Then create all transaction items
+    const itemPromises = data.items.map((item: any) => {
+      return supabase
+        .from('transaction_items')
+        .insert({
+          transaction_id: newTransaction.id,
+          item_type: item.item_type,
+          item_id: item.item_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price
+        });
+    });
     
-    const { error: itemsError } = await supabase
-      .from('transaction_items')
-      .insert(itemsWithTransactionId);
+    await Promise.all(itemPromises);
     
-    if (itemsError) return handleSupabaseError(itemsError);
-    
-    // Update inventory based on transaction items
-    for (const item of items) {
+    // Update inventory based on the transaction
+    const inventoryPromises = data.items.map((item: any) => {
       if (item.item_type === 'fuel') {
-        // Update fuel inventory
-        const { error } = await supabase.rpc('update_fuel_inventory', {
+        return supabase.rpc('update_fuel_inventory', {
           p_fuel_id: item.item_id,
           p_quantity: item.quantity
         });
-        
-        if (error) console.error('Error updating fuel inventory:', error);
       } else if (item.item_type === 'product') {
-        // Update product inventory
-        const { error } = await supabase.rpc('update_product_inventory', {
+        return supabase.rpc('update_product_inventory', {
           p_product_id: item.item_id,
           p_quantity: item.quantity
         });
-        
-        if (error) console.error('Error updating product inventory:', error);
       }
-    }
+      return Promise.resolve();
+    });
     
-    return { data: transaction };
-  },
-  
-  getTransactionsByStation: async (stationId: string, startDate: string, endDate: string) => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*, transaction_items(*)')
-      .eq('station_id', stationId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
+    await Promise.all(inventoryPromises);
     
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getTransactionsByCustomer: async (customerId: string) => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*, transaction_items(*)')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
+    return { success: true, data: newTransaction };
+  } catch (error: any) {
+    toast.error(`Error creating transaction: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Invoice services
-export const invoiceService = {
-  createInvoice: async (invoiceData: any, items: any[]) => {
-    // Create invoice
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .insert(invoiceData)
-      .select()
-      .single();
+// Use the hooks from useSupabase.ts for reports
+export const getSalesReport = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
+  try {
+    // This will be replaced by custom hooks in useSupabase.ts
+    const { data, error } = await supabase.from('transactions')
+      .select('*') 
+      .eq(stationId ? 'station_id' : '', stationId || '');
     
-    if (invoiceError) return handleSupabaseError(invoiceError);
-    
-    // Add invoice items
-    const itemsWithInvoiceId = items.map(item => ({
-      ...item,
-      invoice_id: invoice.id
-    }));
-    
-    const { error: itemsError } = await supabase
-      .from('invoice_items')
-      .insert(itemsWithInvoiceId);
-    
-    if (itemsError) return handleSupabaseError(itemsError);
-    
-    return { data: invoice };
-  },
-  
-  getInvoicesByCustomer: async (customerId: string) => {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*, invoice_items(*), stations:station_id(name)')
-      .eq('customer_id', customerId)
-      .order('issue_date', { ascending: false });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getInvoicesByStation: async (stationId: string, startDate: string, endDate: string) => {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*, invoice_items(*), profiles:customer_id(full_name)')
-      .eq('station_id', stationId)
-      .gte('issue_date', startDate)
-      .lte('issue_date', endDate);
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateInvoiceStatus: async (invoiceId: string, status: string) => {
-    const { data, error } = await supabase
-      .from('invoices')
-      .update({ status })
-      .eq('id', invoiceId)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error: any) {
+    toast.error(`Error getting sales report: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Vehicle services
-export const vehicleService = {
-  getVehiclesByCustomer: async (customerId: string) => {
-    const { data, error } = await supabase
-      .from('vehicles')
+export const getFuelSalesBreakdown = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
+  try {
+    // This will be replaced by custom hooks in useSupabase.ts
+    const { data, error } = await supabase.from('transaction_items')
       .select('*')
-      .eq('customer_id', customerId);
+      .eq('item_type', 'fuel');
     
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  createVehicle: async (vehicleData: any) => {
-    const { data, error } = await supabase
-      .from('vehicles')
-      .insert(vehicleData)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  updateVehicle: async (vehicleId: string, vehicleData: any) => {
-    const { data, error } = await supabase
-      .from('vehicles')
-      .update(vehicleData)
-      .eq('id', vehicleId)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  deleteVehicle: async (vehicleId: string) => {
-    const { error } = await supabase
-      .from('vehicles')
-      .delete()
-      .eq('id', vehicleId);
-    
-    if (error) return handleSupabaseError(error);
-    return { success: true };
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error: any) {
+    toast.error(`Error getting fuel sales breakdown: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Expense services
-export const expenseService = {
-  createExpense: async (expenseData: any) => {
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert(expenseData)
-      .select()
-      .single();
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getExpensesByStation: async (stationId: string, startDate: string, endDate: string) => {
-    const { data, error } = await supabase
-      .from('expenses')
+export const getProductSalesBreakdown = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
+  try {
+    // This will be replaced by custom hooks in useSupabase.ts
+    const { data, error } = await supabase.from('transaction_items')
       .select('*')
-      .eq('station_id', stationId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: false });
+      .eq('item_type', 'product');
     
-    if (error) return handleSupabaseError(error);
-    return { data };
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error: any) {
+    toast.error(`Error getting product sales breakdown: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Activity Log services
-export const activityLogService = {
-  createLog: async (logData: any) => {
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
+export const getStationComparison = async (period: 'daily' | 'monthly' | 'yearly') => {
+  try {
+    // This will be replaced by custom hooks in useSupabase.ts
+    const { data, error } = await supabase.from('stations')
+      .select('*');
     
-    if (!user) {
-      return { error: 'No authenticated user found' };
-    }
-    
-    const { error } = await supabase
-      .from('activity_logs')
-      .insert({
-        ...logData,
-        user_id: user.id
-      });
-    
-    if (error) return handleSupabaseError(error);
-    return { success: true };
-  },
-  
-  getLogs: async (filters: any = {}) => {
-    let query = supabase
-      .from('activity_logs')
-      .select('*, profiles:user_id(full_name, role)')
-      .order('created_at', { ascending: false });
-    
-    // Apply filters
-    if (filters.entity_type) {
-      query = query.eq('entity_type', filters.entity_type);
-    }
-    
-    if (filters.user_id) {
-      query = query.eq('user_id', filters.user_id);
-    }
-    
-    if (filters.start_date && filters.end_date) {
-      query = query
-        .gte('created_at', filters.start_date)
-        .lte('created_at', filters.end_date);
-    }
-    
-    const { data, error } = await query;
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error: any) {
+    toast.error(`Error getting station comparison: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
 
-// Report services
-export const reportService = {
-  getSalesReport: async (stationId: string, startDate: string, endDate: string, groupBy: 'day' | 'month' | 'year') => {
-    const { data, error } = await supabase.rpc('get_sales_report', {
-      p_station_id: stationId, 
-      p_start_date: startDate, 
-      p_end_date: endDate, 
-      p_group_by: groupBy
-    });
+export const getFinancialSummary = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
+  try {
+    // This will be replaced by custom hooks in useSupabase.ts
+    const { data, error } = await supabase.from('transactions')
+      .select('*')
+      .eq(stationId ? 'station_id' : '', stationId || '');
     
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getFuelSalesBreakdown: async (stationId: string, startDate: string, endDate: string) => {
-    const { data, error } = await supabase.rpc('get_fuel_sales_breakdown', {
-      p_station_id: stationId, 
-      p_start_date: startDate, 
-      p_end_date: endDate
-    });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getProductSalesBreakdown: async (stationId: string, startDate: string, endDate: string) => {
-    const { data, error } = await supabase.rpc('get_product_sales_breakdown', {
-      p_station_id: stationId, 
-      p_start_date: startDate, 
-      p_end_date: endDate
-    });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getStationComparison: async (startDate: string, endDate: string) => {
-    const { data, error } = await supabase.rpc('get_station_comparison', {
-      p_start_date: startDate, 
-      p_end_date: endDate
-    });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
-  },
-  
-  getFinancialSummary: async (stationId: string, startDate: string, endDate: string) => {
-    const { data, error } = await supabase.rpc('get_financial_summary', {
-      p_station_id: stationId, 
-      p_start_date: startDate, 
-      p_end_date: endDate
-    });
-    
-    if (error) return handleSupabaseError(error);
-    return { data };
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error: any) {
+    toast.error(`Error getting financial summary: ${error.message}`);
+    return { success: false, error: error.message };
   }
 };
