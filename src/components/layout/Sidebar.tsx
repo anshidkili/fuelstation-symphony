@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
 
@@ -171,10 +171,18 @@ const Sidebar = () => {
     ));
   };
 
+  const sidebarClasses = `h-full border-r border-border bg-card py-4 flex flex-col transition-all duration-300 ${
+    isOpen ? 'w-60' : 'w-0 md:w-16 overflow-hidden'
+  }`;
+
   return (
-    <div className="h-full w-60 border-r border-border bg-card py-4 flex flex-col">
-      <div className="px-4 mb-6">
-        <h1 className="text-xl font-bold">Fuel Symphony</h1>
+    <div className={sidebarClasses}>
+      <div className={`px-4 mb-6 ${!isOpen && 'md:px-2'}`}>
+        {isOpen ? (
+          <h1 className="text-xl font-bold">Fuel Symphony</h1>
+        ) : (
+          <h1 className="text-xl font-bold hidden md:flex justify-center">FS</h1>
+        )}
       </div>
       <div className="space-y-1 px-3 flex-1 overflow-auto">
         {renderNavItems()}
@@ -185,7 +193,7 @@ const Sidebar = () => {
           className="flex items-center gap-2 p-2 rounded-md text-sm text-red-500 hover:bg-red-50 w-full"
         >
           <LogOut size={20} />
-          <span>Logout</span>
+          {isOpen && <span>Logout</span>}
         </button>
       </div>
     </div>
@@ -193,3 +201,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+

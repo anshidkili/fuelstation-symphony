@@ -1,9 +1,10 @@
 
 import { useState } from "react";
+import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -13,51 +14,50 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/context/AuthContext";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-const loginSchema = z.object({
+const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  password: z.string().min(6, {
+    message: "Password must be at least 6 characters",
+  }),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
-
 export function LoginForm() {
-  const { signIn } = useAuth();
-  const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
       password: "",
     },
   });
 
-  const onSubmit = async (data: LoginFormValues) => {
-    setIsSubmitting(true);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await signIn(data.email, data.password);
-      navigate("/dashboard");
+      setIsLoading(true);
+      await login(values.email, values.password);
+    } catch (error) {
+      console.error("Login error:", error);
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
-  };
+  }
 
   return (
-    <Card className="w-full max-w-md mx-auto glass-card animate-scale-in p-1">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">Sign In</CardTitle>
-        <CardDescription className="text-center">
-          Enter your credentials to access your account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+      <div className="flex flex-col space-y-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome to Fuel Symphony
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your credentials to sign in to your account
+        </p>
+      </div>
+
+      <div className="grid gap-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -67,11 +67,10 @@ export function LoginForm() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="email@example.com" 
-                      {...field} 
-                      className="input-focus"
-                      autoComplete="email"
+                    <Input
+                      placeholder="example@email.com"
+                      type="email"
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -85,65 +84,21 @@ export function LoginForm() {
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        {...field}
-                        className="input-focus pr-10"
-                        autoComplete="current-password"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 py-1 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="sr-only">
-                          {showPassword ? "Hide password" : "Show password"}
-                        </span>
-                      </Button>
-                    </div>
+                    <Input placeholder="******" type="password" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button 
-              type="submit" 
-              className="w-full transition-all" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Sign In
             </Button>
           </form>
         </Form>
-      </CardContent>
-      <CardFooter className="text-center text-sm text-muted-foreground">
-        <div className="w-full">
-          This is a demo system. Use any of the following emails with password "password":
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
-            <code className="bg-muted p-1 rounded">superadmin@fuelstation.com</code>
-            <code className="bg-muted p-1 rounded">admin@fuelstation.com</code>
-            <code className="bg-muted p-1 rounded">employee@fuelstation.com</code>
-            <code className="bg-muted p-1 rounded">customer@company.com</code>
-          </div>
-        </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

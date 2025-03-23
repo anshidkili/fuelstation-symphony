@@ -1,123 +1,145 @@
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
+import { UserRole } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { UserRole } from "@/lib/constants";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, LogOut, Menu, User } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useState } from "react";
+import {
+  Bell,
+  ChevronDown,
+  CircleUser,
+  LogOut,
+  Menu,
+  Settings,
+  UserCircle,
+} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 interface HeaderProps {
   toggleSidebar: () => void;
 }
 
 export function Header({ toggleSidebar }: HeaderProps) {
-  const { user, signOut } = useAuth();
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
-
-  const getRoleColor = (role: UserRole) => {
-    switch (role) {
-      case UserRole.SUPER_ADMIN:
-        return "bg-purple-500";
-      case UserRole.ADMIN:
-        return "bg-blue-500";
-      case UserRole.EMPLOYEE:
-        return "bg-green-500";
-      case UserRole.CREDIT_CUSTOMER:
-        return "bg-amber-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <header className="h-16 px-4 flex items-center justify-between border-b border-border glass z-10">
-      <div className="flex items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="mr-2 md:hidden"
-          onClick={toggleSidebar}
-        >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle sidebar</span>
-        </Button>
-        <div className="font-display font-bold text-lg">Fuel Symphony</div>
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <DropdownMenu open={showNotifications} onOpenChange={setShowNotifications}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              <span className="sr-only">Notifications</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="max-h-[300px] overflow-y-auto">
-              <div className="py-2 px-4 text-sm text-center text-muted-foreground">
-                No new notifications
-              </div>
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <ThemeToggle />
-
-        {user && (
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+      <button
+        id="sidebar-trigger"
+        className="inline-flex h-9 w-9 items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:hidden"
+        onClick={toggleSidebar}
+      >
+        <Menu className="h-5 w-5" />
+        <span className="sr-only">Toggle Menu</span>
+      </button>
+      
+      <div className="flex flex-1 items-center justify-between">
+        <div>
+          {/* Breadcrumb or page title could go here */}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* Notifications Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative flex items-center gap-2 pl-2 pr-4 transition-all"
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className={getRoleColor(user.role)}>
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden md:inline text-sm font-medium">{user.name}</span>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                  3
+                </span>
+                <span className="sr-only">Notifications</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col">
-                  <span className="font-medium">{user.name}</span>
-                  <span className="text-xs text-muted-foreground">{user.email}</span>
-                </div>
-              </DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
+              <div className="max-h-[300px] overflow-y-auto">
+                <DropdownMenuItem className="cursor-pointer">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">New Invoice Created</p>
+                    <p className="text-xs text-muted-foreground">2 minutes ago</p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">Fuel Inventory Low</p>
+                    <p className="text-xs text-muted-foreground">1 hour ago</p>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">New Employee Registered</p>
+                    <p className="text-xs text-muted-foreground">3 hours ago</p>
+                  </div>
+                </DropdownMenuItem>
+              </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => signOut()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Sign out</span>
+              <DropdownMenuItem className="cursor-pointer justify-center">
+                <Link to="/notifications" className="text-sm font-medium">
+                  View all notifications
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
+          
+          {/* Theme Toggle */}
+          <ThemeToggle />
+          
+          {/* User Menu */}
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2">
+                  <CircleUser className="h-5 w-5" />
+                  <span className="hidden md:inline-block text-sm font-medium">
+                    {user.full_name}
+                  </span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="flex flex-col">
+                  <span>{user.full_name}</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {user.role}
+                    {user.role === UserRole.ADMIN && user.station_name && ` • ${user.station_name}`}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/profile")}
+                    className="cursor-pointer"
+                  >
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/settings")}
+                    className="cursor-pointer"
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-500">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
     </header>
   );

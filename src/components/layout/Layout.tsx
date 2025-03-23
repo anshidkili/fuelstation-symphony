@@ -2,13 +2,13 @@
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Header } from "./Header";
-import { Sidebar } from "./Sidebar";
-import { useAuth } from "@/context/AuthContext";
+import Sidebar from "./Sidebar";
+import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   // Close sidebar when clicking outside on mobile
@@ -36,13 +36,13 @@ export function Layout() {
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!loading && !user) {
       navigate("/login");
     }
-  }, [user, isLoading, navigate]);
+  }, [user, loading, navigate]);
 
   // Show loading spinner while checking authentication
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

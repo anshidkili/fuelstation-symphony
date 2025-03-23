@@ -1,11 +1,19 @@
+
 import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
 
 // Initialize Supabase client with fallback URLs for development
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-ref.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://qkqgqkkcwskkvnopplud.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrcWdxa2tjd3Nra3Zub3BwbHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2MjYwNjcsImV4cCI6MjA1ODIwMjA2N30.7BFYt3KgNjkXjpfUV9tpWvrB8hH9320ZM0MMRSQfmhw';
 
 // Create the Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    storageKey: 'fs_auth',
+  },
+});
 
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error: any) => {

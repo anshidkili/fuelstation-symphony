@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 // Generic hook for fetching data from Supabase
@@ -55,10 +55,16 @@ export function useSupabaseFetch<T>(
 // Station hooks
 export function useStations() {
   return useSupabaseFetch<any[]>(async () => {
-    return await supabase
-      .from('stations')
-      .select('*')
-      .order('name');
+    try {
+      const response = await supabase
+        .from('stations')
+        .select('*')
+        .order('name');
+      return response;
+    } catch (error) {
+      console.error('Error fetching stations:', error);
+      return { data: null, error: error as any };
+    }
   }, []);
 }
 
@@ -68,20 +74,32 @@ export function useStation(stationId: string | null) {
       return { data: null, error: null } as PostgrestSingleResponse<any>;
     }
     
-    return await supabase
-      .from('stations')
-      .select('*')
-      .eq('id', stationId)
-      .single();
+    try {
+      const response = await supabase
+        .from('stations')
+        .select('*')
+        .eq('id', stationId)
+        .single();
+      return response;
+    } catch (error) {
+      console.error('Error fetching station:', error);
+      return { data: null, error: error as any };
+    }
   }, [stationId]);
 }
 
 // Basic function to fetch profiles
 export function useProfiles() {
   return useSupabaseFetch<any[]>(async () => {
-    return await supabase
-      .from('profiles')
-      .select('*')
-      .order('full_name');
+    try {
+      const response = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name');
+      return response;
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+      return { data: null, error: error as any };
+    }
   }, []);
 }

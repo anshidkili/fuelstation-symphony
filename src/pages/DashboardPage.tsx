@@ -1,5 +1,5 @@
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { UserRole } from "@/lib/constants";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { Button } from "@/components/ui/button";
@@ -688,7 +688,7 @@ export default function DashboardPage() {
     <div>
       {user && (
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
+          <h1 className="text-2xl font-bold">Welcome, {user.full_name}</h1>
           <p className="text-muted-foreground">
             {user.role === UserRole.ADMIN || user.role === UserRole.EMPLOYEE
               ? `${user.station_name} • `

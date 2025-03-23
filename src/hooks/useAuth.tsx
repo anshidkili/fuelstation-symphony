@@ -1,8 +1,9 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 export type User = {
   id: string;
@@ -26,15 +27,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
   const navigate = useNavigate();
 
   // Check auth status on initial load
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data: authData } = await supabase.auth.getSession();
-        
-        if (authData?.session?.user) {
+    // Set up auth state listener FIRST
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession);
+      
+      if (event === 'SIGNED_IN' && newSession) {
+        try {
           const { data, error } = await supabase
             .from('profiles')
             .select(`
@@ -43,9 +46,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               role,
               station_id,
               email,
-              stations:station_id (name)
+              stations(name)
             `)
-            .eq('user_id', authData.session.user.id)
+            .eq('user_id', newSession.user.id)
+            .maybeSingle();
+
+          if (data && !error) {
+            setUser({
+              id: data.id,
+              full_name: data.full_name,
+              role: data.role,
+              station_id: data.station_id,
+              station_name: data.stations?.name,
+              email: data.email,
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user after auth change:', error);
+        } finally {
+          setLoading(false);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    // THEN check for existing session
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              full_name,
+              role,
+              station_id,
+              email,
+              stations(name)
+            `)
+            .eq('user_id', session.user.id)
             .maybeSingle();
 
           if (data && !error) {
@@ -66,42 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    fetchUser();
-
-    // Subscribe to auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select(`
-              id,
-              full_name,
-              role,
-              station_id,
-              email,
-              stations:station_id (name)
-            `)
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-
-          if (data && !error) {
-            setUser({
-              id: data.id,
-              full_name: data.full_name,
-              role: data.role,
-              station_id: data.station_id,
-              station_name: data.stations?.name,
-              email: data.email,
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching user after auth change:', error);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-      }
-    });
+    checkSession();
 
     return () => {
       authListener.subscription.unsubscribe();

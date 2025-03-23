@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 const SupabaseInitializer = ({ children }: { children: React.ReactNode }) => {
@@ -13,9 +13,7 @@ const SupabaseInitializer = ({ children }: { children: React.ReactNode }) => {
         // Check connection by making a simple query
         const { error } = await supabase
           .from('profiles')
-          .select('count')
-          .limit(1)
-          .single();
+          .select('count', { count: 'exact', head: true });
         
         if (error && error.code !== 'PGRST116') {
           console.error('Supabase initialization error:', error);
