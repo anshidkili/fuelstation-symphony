@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export const SupabaseInitializer = ({ children }: { children: React.ReactNode }) => {
+const SupabaseInitializer = ({ children }: { children: React.ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,7 +11,10 @@ export const SupabaseInitializer = ({ children }: { children: React.ReactNode })
     const initializeSupabase = async () => {
       try {
         // Check connection by making a simple query
-        const { error } = await supabase.from('profiles').select('count', { count: 'exact' }).limit(1);
+        const { error } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact' })
+          .limit(1);
         
         if (error) {
           console.error('Supabase initialization error:', error);

@@ -64,7 +64,9 @@ export function useStations() {
 
 export function useStation(stationId: string | null) {
   return useSupabaseFetch(async () => {
-    if (!stationId) return { data: null, error: null, count: null, status: 0, statusText: '' };
+    if (!stationId) {
+      return { data: null, error: null } as PostgrestSingleResponse<any>;
+    }
     
     return await supabase
       .from('stations')
@@ -74,194 +76,12 @@ export function useStation(stationId: string | null) {
   }, [stationId]);
 }
 
-// User/Profile hooks
-export function useAdmins() {
+// Basic function to fetch profiles
+export function useProfiles() {
   return useSupabaseFetch(async () => {
     return await supabase
       .from('profiles')
-      .select(`
-        *,
-        stations:station_id (
-          name
-        )
-      `)
-      .eq('role', 'Admin');
+      .select('*')
+      .order('full_name');
   }, []);
-}
-
-export function useEmployees(stationId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('profiles')
-      .select('*')
-      .eq('station_id', stationId)
-      .eq('role', 'Employee');
-  }, [stationId]);
-}
-
-export function useCustomers(stationId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('profiles')
-      .select('*')
-      .eq('station_id', stationId)
-      .eq('role', 'Credit Customer');
-  }, [stationId]);
-}
-
-// Dispenser hooks
-export function useDispensers(stationId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('dispensers')
-      .select('*')
-      .eq('station_id', stationId);
-  }, [stationId]);
-}
-
-// Inventory hooks
-export function useFuelInventory(stationId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('fuel_inventory')
-      .select('*')
-      .eq('station_id', stationId);
-  }, [stationId]);
-}
-
-export function useProducts(stationId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('products')
-      .select('*')
-      .eq('station_id', stationId);
-  }, [stationId]);
-}
-
-// Shift hooks
-export function useActiveShifts(stationId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('shifts')
-      .select(`
-        *,
-        employees:employee_id (
-          full_name
-        )
-      `)
-      .eq('station_id', stationId)
-      .eq('status', 'active');
-  }, [stationId]);
-}
-
-// Transaction hooks
-export function useTransactions(stationId: string | null, startDate: string, endDate: string) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('transactions')
-      .select(`
-        *,
-        transaction_items (*)
-      `)
-      .eq('station_id', stationId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
-  }, [stationId, startDate, endDate]);
-}
-
-// Invoice hooks
-export function useInvoices(stationId: string | null, startDate: string, endDate: string) {
-  return useSupabaseFetch(async () => {
-    if (!stationId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('invoices')
-      .select(`
-        *,
-        invoice_items (*),
-        profiles:customer_id (
-          full_name
-        )
-      `)
-      .eq('station_id', stationId)
-      .gte('issue_date', startDate)
-      .lte('issue_date', endDate);
-  }, [stationId, startDate, endDate]);
-}
-
-// Customer-specific hooks
-export function useCustomerInvoices(customerId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!customerId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('invoices')
-      .select(`
-        *,
-        invoice_items (*),
-        stations:station_id (
-          name
-        )
-      `)
-      .eq('customer_id', customerId)
-      .order('issue_date', { ascending: false });
-  }, [customerId]);
-}
-
-export function useCustomerVehicles(customerId: string | null) {
-  return useSupabaseFetch(async () => {
-    if (!customerId) return { data: [], error: null, count: null, status: 0, statusText: '' };
-    
-    return await supabase
-      .from('vehicles')
-      .select('*')
-      .eq('customer_id', customerId);
-  }, [customerId]);
-}
-
-// Activity log hooks
-export function useActivityLogs(filters: Record<string, any> = {}) {
-  return useSupabaseFetch(async () => {
-    let query = supabase
-      .from('activity_logs')
-      .select(`
-        *,
-        profiles:user_id (
-          full_name,
-          role
-        )
-      `)
-      .order('created_at', { ascending: false });
-    
-    // Apply filters
-    if (filters.entity_type) {
-      query = query.eq('entity_type', filters.entity_type);
-    }
-    
-    if (filters.user_id) {
-      query = query.eq('user_id', filters.user_id);
-    }
-    
-    if (filters.start_date && filters.end_date) {
-      query = query
-        .gte('created_at', filters.start_date)
-        .lte('created_at', filters.end_date);
-    }
-    
-    return await query;
-  }, [filters]);
 }
