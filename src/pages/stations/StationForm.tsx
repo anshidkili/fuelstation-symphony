@@ -138,9 +138,15 @@ export default function StationForm() {
         toast.success("Station updated successfully");
       } else {
         // Fix: Ensure name is a required field and present in the data
+        // The insert method requires name to be non-optional, so we need to make
+        // sure it's always defined before sending to the API
+        if (!data.name) {
+          throw new Error("Station name is required");
+        }
+
         const { error } = await supabase
           .from("stations")
-          .insert([data]);
+          .insert(data); // Pass the data object directly, not as an array
 
         if (error) throw error;
 
