@@ -1,0 +1,6 @@
+
+# A string used as the project reference
+project_id = "qkqgqkkcwskkvnopplud"
+
+[functions.create-test-users]
+verify_jwt = false
