@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -78,7 +77,6 @@ export default function StationForm() {
   });
 
   useEffect(() => {
-    // Only Super Admin can access this page
     if (user && user.role !== UserRole.SUPER_ADMIN) {
       navigate("/");
       toast.error("You don't have permission to access this page");
@@ -127,26 +125,34 @@ export default function StationForm() {
     setLoading(true);
 
     try {
+      if (!data.name) {
+        throw new Error("Station name is required");
+      }
+
+      const stationData = {
+        name: data.name,
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        zip: data.zip,
+        phone: data.phone,
+        email: data.email,
+        status: data.status
+      };
+
       if (isEditMode) {
         const { error } = await supabase
           .from("stations")
-          .update(data)
+          .update(stationData)
           .eq("id", id);
 
         if (error) throw error;
 
         toast.success("Station updated successfully");
       } else {
-        // Fix: Ensure name is a required field and present in the data
-        // The insert method requires name to be non-optional, so we need to make
-        // sure it's always defined before sending to the API
-        if (!data.name) {
-          throw new Error("Station name is required");
-        }
-
         const { error } = await supabase
           .from("stations")
-          .insert(data); // Pass the data object directly, not as an array
+          .insert(stationData);
 
         if (error) throw error;
 
