@@ -196,62 +196,72 @@ export function useTransactions(stationId: string | null, shiftId: string | null
   }, [stationId, shiftId]);
 }
 
-// Dashboard/reporting hooks - Direct SQL queries
+// Dashboard/reporting hooks - Using standard queries instead of RPC calls for now
 export function useSalesReport(stationId: string | null, period: 'daily' | 'monthly' | 'yearly' = 'daily') {
   return useSupabaseFetch<any[]>(async () => {
-    const params: Record<string, any> = { period };
+    // Using transactions table directly for now until RPC functions are created
+    let query = supabase.from('transactions').select('*');
     
     if (stationId) {
-      params.station_id = stationId;
+      query = query.eq('station_id', stationId);
     }
     
-    return await supabase
-      .rpc('get_sales_report', params);
+    return await query;
   }, [stationId, period]);
 }
 
 export function useFuelSalesBreakdown(stationId: string | null, period: 'daily' | 'monthly' | 'yearly' = 'daily') {
   return useSupabaseFetch<any[]>(async () => {
-    const params: Record<string, any> = { period };
+    // Using transaction_items table filtered to fuel types
+    let query = supabase
+      .from('transaction_items')
+      .select('*, transactions(*)')
+      .eq('item_type', 'fuel');
     
     if (stationId) {
-      params.station_id = stationId;
+      query = query.eq('transactions.station_id', stationId);
     }
     
-    return await supabase
-      .rpc('get_fuel_sales_breakdown', params);
+    return await query;
   }, [stationId, period]);
 }
 
 export function useProductSalesBreakdown(stationId: string | null, period: 'daily' | 'monthly' | 'yearly' = 'daily') {
   return useSupabaseFetch<any[]>(async () => {
-    const params: Record<string, any> = { period };
+    // Using transaction_items table filtered to product types
+    let query = supabase
+      .from('transaction_items')
+      .select('*, transactions(*)')
+      .eq('item_type', 'product');
     
     if (stationId) {
-      params.station_id = stationId;
+      query = query.eq('transactions.station_id', stationId);
     }
     
-    return await supabase
-      .rpc('get_product_sales_breakdown', params);
+    return await query;
   }, [stationId, period]);
 }
 
 export function useStationComparison(period: 'daily' | 'monthly' | 'yearly' = 'monthly') {
   return useSupabaseFetch<any[]>(async () => {
+    // For now, just getting all stations with their transactions
     return await supabase
-      .rpc('get_station_comparison', { period });
+      .from('stations')
+      .select('*, transactions(*)');
   }, [period]);
 }
 
 export function useFinancialSummary(stationId: string | null, period: 'daily' | 'monthly' | 'yearly' = 'monthly') {
   return useSupabaseFetch<any>(async () => {
-    const params: Record<string, any> = { period };
+    // For now just using basic transaction data
+    let query = supabase
+      .from('transactions')
+      .select('*');
     
     if (stationId) {
-      params.station_id = stationId;
+      query = query.eq('station_id', stationId);
     }
     
-    return await supabase
-      .rpc('get_financial_summary', params);
+    return await query;
   }, [stationId, period]);
 }

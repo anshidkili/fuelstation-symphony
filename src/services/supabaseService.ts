@@ -181,7 +181,10 @@ export const restockFuel = async (id: string, amount: number) => {
     
     const { data: updatedInventory, error } = await supabase
       .from('fuel_inventory')
-      .update({ current_stock: newStock, updated_at: new Date() })
+      .update({ 
+        current_stock: newStock, 
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id)
       .select()
       .single();
@@ -257,7 +260,10 @@ export const restockProduct = async (id: string, amount: number) => {
     
     const { data: updatedProduct, error } = await supabase
       .from('products')
-      .update({ current_stock: newStock, updated_at: new Date() })
+      .update({ 
+        current_stock: newStock, 
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id)
       .select()
       .single();
@@ -273,16 +279,18 @@ export const restockProduct = async (id: string, amount: number) => {
 // Shift management
 export const startShift = async (data: any) => {
   try {
+    const shiftData = {
+      station_id: data.station_id,
+      employee_id: data.employee_id,
+      start_time: new Date().toISOString(),
+      dispensers: data.dispensers,
+      starting_cash: data.starting_cash,
+      status: 'active'
+    };
+    
     const { data: newShift, error } = await supabase
       .from('shifts')
-      .insert({
-        station_id: data.station_id,
-        employee_id: data.employee_id,
-        start_time: new Date(),
-        dispensers: data.dispensers,
-        starting_cash: data.starting_cash,
-        status: 'active'
-      })
+      .insert(shiftData)
       .select()
       .single();
     
@@ -315,7 +323,7 @@ export const endShift = async (id: string, data: any) => {
     const { data: updatedShift, error } = await supabase
       .from('shifts')
       .update({
-        end_time: new Date(),
+        end_time: new Date().toISOString(),
         ending_cash: data.ending_cash,
         status: 'completed'
       })
@@ -405,13 +413,16 @@ export const createTransaction = async (data: any) => {
   }
 };
 
-// Use the hooks from useSupabase.ts for reports
+// For reporting functions, use direct queries until RPC functions are created
 export const getSalesReport = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
   try {
-    // This will be replaced by custom hooks in useSupabase.ts
-    const { data, error } = await supabase.from('transactions')
-      .select('*') 
-      .eq(stationId ? 'station_id' : '', stationId || '');
+    let query = supabase.from('transactions').select('*'); 
+    
+    if (stationId) {
+      query = query.eq('station_id', stationId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) throw error;
     return { success: true, data };
@@ -423,10 +434,15 @@ export const getSalesReport = async (stationId: string | null, period: 'daily' |
 
 export const getFuelSalesBreakdown = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
   try {
-    // This will be replaced by custom hooks in useSupabase.ts
-    const { data, error } = await supabase.from('transaction_items')
-      .select('*')
+    let query = supabase.from('transaction_items')
+      .select('*, transactions(*)')
       .eq('item_type', 'fuel');
+    
+    if (stationId) {
+      query = query.eq('transactions.station_id', stationId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) throw error;
     return { success: true, data };
@@ -438,10 +454,15 @@ export const getFuelSalesBreakdown = async (stationId: string | null, period: 'd
 
 export const getProductSalesBreakdown = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
   try {
-    // This will be replaced by custom hooks in useSupabase.ts
-    const { data, error } = await supabase.from('transaction_items')
-      .select('*')
+    let query = supabase.from('transaction_items')
+      .select('*, transactions(*)')
       .eq('item_type', 'product');
+    
+    if (stationId) {
+      query = query.eq('transactions.station_id', stationId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) throw error;
     return { success: true, data };
@@ -453,9 +474,8 @@ export const getProductSalesBreakdown = async (stationId: string | null, period:
 
 export const getStationComparison = async (period: 'daily' | 'monthly' | 'yearly') => {
   try {
-    // This will be replaced by custom hooks in useSupabase.ts
     const { data, error } = await supabase.from('stations')
-      .select('*');
+      .select('*, transactions(*)');
     
     if (error) throw error;
     return { success: true, data };
@@ -467,10 +487,14 @@ export const getStationComparison = async (period: 'daily' | 'monthly' | 'yearly
 
 export const getFinancialSummary = async (stationId: string | null, period: 'daily' | 'monthly' | 'yearly') => {
   try {
-    // This will be replaced by custom hooks in useSupabase.ts
-    const { data, error } = await supabase.from('transactions')
-      .select('*')
-      .eq(stationId ? 'station_id' : '', stationId || '');
+    let query = supabase.from('transactions')
+      .select('*');
+    
+    if (stationId) {
+      query = query.eq('station_id', stationId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) throw error;
     return { success: true, data };

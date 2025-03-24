@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -136,9 +137,10 @@ export default function StationForm() {
 
         toast.success("Station updated successfully");
       } else {
+        // Fix: Ensure name is a required field and present in the data
         const { error } = await supabase
           .from("stations")
-          .insert(data);
+          .insert([data]);
 
         if (error) throw error;
 

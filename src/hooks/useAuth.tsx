@@ -2,7 +2,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 export type User = {
@@ -28,7 +27,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
-  const navigate = useNavigate();
 
   // Check auth status on initial load
   useEffect(() => {
@@ -128,7 +126,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       toast.success('Logged in successfully');
-      navigate('/');
+      
+      // Use window.location instead of navigate
+      window.location.href = '/';
     } catch (error: any) {
       toast.error(error.message || 'Failed to login');
       throw error;
@@ -145,7 +145,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setUser(null);
       toast.success('Logged out successfully');
-      navigate('/login');
+      
+      // Use window.location instead of navigate
+      window.location.href = '/login';
     } catch (error: any) {
       toast.error(error.message || 'Failed to logout');
     }
