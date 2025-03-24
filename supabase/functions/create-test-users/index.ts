@@ -1,189 +1,172 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+// Follow this setup guide to integrate the Deno runtime into your application:
+// https://docs.supabase.com/reference/deno/initialize
 
-// Set up CORS headers for the function
+import { serve } from "https://deno.land/std@0.131.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
-Deno.serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
+  
   try {
-    // Create a Supabase client with the admin key
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    // Create a Supabase client with the Auth context of the logged in user
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables for Supabase connection');
+    // Get the first available stations for the users
+    const { data: stations } = await supabaseClient
+      .from('stations')
+      .select('id, name')
+      .eq('status', 'active')
+      .limit(2);
+      
+    if (!stations || stations.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'No active stations found. Please create stations first.'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Define test users for each role
+    // Define test users
     const testUsers = [
       {
         email: 'superadmin@fuelsymphony.com',
         password: 'Password123!',
         role: 'Super Admin',
-        full_name: 'Super Admin User',
+        full_name: 'Super Admin',
       },
       {
         email: 'admin@fuelsymphony.com',
         password: 'Password123!',
         role: 'Admin',
-        full_name: 'Admin User',
+        full_name: 'Station Admin',
+        station_id: stations[0].id,
       },
       {
         email: 'employee@fuelsymphony.com',
         password: 'Password123!',
         role: 'Employee',
-        full_name: 'Employee User',
+        full_name: 'Station Employee',
+        station_id: stations[0].id,
       },
       {
         email: 'customer@fuelsymphony.com',
         password: 'Password123!',
         role: 'Credit Customer',
-        full_name: 'Credit Customer User',
+        full_name: 'Credit Customer',
+        station_id: stations[0].id,
       },
     ];
 
-    // Create or update the users
     const createdUsers = [];
 
+    // Create or update each test user
     for (const user of testUsers) {
       // Check if user already exists
-      const { data: existingUser } = await supabase
+      const { data: existingUsers } = await supabaseClient
         .from('profiles')
         .select('*')
         .eq('email', user.email)
-        .maybeSingle();
+        .limit(1);
 
-      if (existingUser) {
-        console.log(`User ${user.email} already exists, skipping creation`);
+      if (existingUsers && existingUsers.length > 0) {
+        console.log(`User ${user.email} already exists, updating...`);
+        
+        // Update existing user
+        await supabaseClient
+          .from('profiles')
+          .update({
+            role: user.role,
+            full_name: user.full_name,
+            station_id: user.station_id,
+            status: 'active',
+          })
+          .eq('email', user.email);
+
         createdUsers.push({
           email: user.email,
           password: user.password,
           role: user.role,
         });
-        continue;
-      }
-
-      // Create the auth user
-      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email: user.email,
-        password: user.password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: user.full_name,
-          role: user.role,
-        },
-      });
-
-      if (authError) {
-        console.error(`Error creating auth user ${user.email}:`, authError);
-        throw authError;
-      }
-      
-      // Get the profiles data to verify it was created by the trigger
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', authUser.user.id)
-        .maybeSingle();
-      
-      if (profileError) {
-        console.error(`Error fetching profile for ${user.email}:`, profileError);
-      } else if (!profileData) {
-        console.error(`Profile not created for ${user.email}`);
       } else {
-        console.log(`Successfully created user and profile for ${user.email}`);
-      }
+        console.log(`Creating new user: ${user.email}`);
+        
+        // Create new user
+        const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
+          email: user.email,
+          password: user.password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: user.full_name,
+            role: user.role,
+          },
+        });
 
-      // If this is an Admin, assign to first station
-      if (user.role === 'Admin') {
-        // Get the first station
-        const { data: stations } = await supabase
-          .from('stations')
-          .select('id')
-          .eq('status', 'active')
-          .limit(1);
-          
-        if (stations && stations.length > 0) {
-          const stationId = stations[0].id;
-          
-          // Update the profile with the station ID
-          await supabase
-            .from('profiles')
-            .update({ station_id: stationId, status: 'active' })
-            .eq('user_id', authUser.user.id);
+        if (authError) {
+          console.error(`Error creating user ${user.email}:`, authError);
+          continue;
         }
-      }
-      
-      // If this is an Employee, assign to first station
-      if (user.role === 'Employee') {
-        // Get the first station
-        const { data: stations } = await supabase
-          .from('stations')
-          .select('id')
-          .eq('status', 'active')
-          .limit(1);
-          
-        if (stations && stations.length > 0) {
-          const stationId = stations[0].id;
-          
-          // Update the profile with the station ID and hourly rate
-          await supabase
+
+        // Update the profile with additional data
+        if (authUser?.user) {
+          await supabaseClient
             .from('profiles')
-            .update({ 
-              station_id: stationId, 
+            .update({
+              role: user.role,
+              station_id: user.station_id,
               status: 'active',
-              hourly_rate: 15.00
             })
             .eq('user_id', authUser.user.id);
         }
-      }
 
-      // Add user to created users list with credentials
-      createdUsers.push({
-        email: user.email,
-        password: user.password,
-        role: user.role,
-      });
+        createdUsers.push({
+          email: user.email,
+          password: user.password,
+          role: user.role,
+        });
+      }
     }
 
-    // Return the created users
     return new Response(
-      JSON.stringify({
-        success: true,
-        users: createdUsers,
+      JSON.stringify({ 
+        success: true, 
+        message: 'Test users created successfully',
+        users: createdUsers
       }),
       {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
       }
     );
   } catch (error) {
     console.error('Error creating test users:', error);
     
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: error.message,
-      }),
+      JSON.stringify({ success: false, message: error.message }),
       {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
       }
     );
   }
