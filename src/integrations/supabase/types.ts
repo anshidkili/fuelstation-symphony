@@ -118,6 +118,50 @@ export type Database = {
           },
         ]
       }
+      financial_reports: {
+        Row: {
+          created_at: string | null
+          expenses_amount: number
+          id: string
+          profit_amount: number
+          report_date: string
+          report_type: string
+          sales_amount: number
+          station_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expenses_amount: number
+          id?: string
+          profit_amount: number
+          report_date: string
+          report_type: string
+          sales_amount: number
+          station_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expenses_amount?: number
+          id?: string
+          profit_amount?: number
+          report_date?: string
+          report_type?: string
+          sales_amount?: number
+          station_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_reports_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fuel_inventory: {
         Row: {
           alert_threshold: number
@@ -314,6 +358,57 @@ export type Database = {
           },
         ]
       }
+      payment_reminders: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          id: string
+          invoice_id: string
+          message: string | null
+          reminder_date: string
+          sent_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          invoice_id: string
+          message?: string | null
+          reminder_date: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          invoice_id?: string
+          message?: string | null
+          reminder_date?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reminders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           alert_threshold: number
@@ -410,6 +505,50 @@ export type Database = {
             columns: ["station_id"]
             isOneToOne: false
             referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_mismatches: {
+        Row: {
+          actual_amount: number
+          created_at: string | null
+          expected_amount: number
+          id: string
+          is_resolved: boolean | null
+          mismatch_amount: number
+          resolution_notes: string | null
+          shift_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_amount: number
+          created_at?: string | null
+          expected_amount: number
+          id?: string
+          is_resolved?: boolean | null
+          mismatch_amount: number
+          resolution_notes?: string | null
+          shift_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_amount?: number
+          created_at?: string | null
+          expected_amount?: number
+          id?: string
+          is_resolved?: boolean | null
+          mismatch_amount?: number
+          resolution_notes?: string | null
+          shift_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_mismatches_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]
@@ -670,12 +809,43 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_employee_salary: {
+        Args: {
+          p_employee_id: string
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: number
+      }
+      calculate_sales_mismatch: {
+        Args: {
+          p_shift_id: string
+        }
+        Returns: number
+      }
+      generate_financial_report: {
+        Args: {
+          p_station_id: string
+          p_report_type: string
+          p_report_date: string
+        }
+        Returns: string
+      }
       get_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
       get_user_station_id: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      log_admin_action: {
+        Args: {
+          p_action: string
+          p_entity_type: string
+          p_entity_id: string
+          p_details: Json
+        }
         Returns: string
       }
       update_fuel_inventory: {

@@ -19,7 +19,16 @@ import {
   ShoppingCart,
   Fuel,
   Warehouse,
-  Car
+  Car,
+  Activity,
+  ReceiptText,
+  Bell,
+  History,
+  AlertTriangle,
+  Gauge,
+  Calculator,
+  CalendarRange,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -64,16 +73,19 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
         {
           path: '/activity-log',
           label: 'Activity Log',
-          icon: <Clock size={20} />,
+          icon: <History size={20} />,
         }
       );
     } else if (user.role === 'Admin') {
       navItems.push(
+        // Staff Management
         {
           path: '/employees',
           label: 'Employees',
           icon: <Users size={20} />,
         },
+        
+        // Station Operations
         {
           path: '/dispensers',
           label: 'Dispensers',
@@ -83,22 +95,36 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
           path: '/inventory',
           label: 'Inventory',
           icon: <Warehouse size={20} />,
-        },
-        {
-          path: '/products',
-          label: 'Products',
-          icon: <Package size={20} />,
+          children: [
+            {
+              path: '/inventory/fuel',
+              label: 'Fuel Inventory',
+            },
+            {
+              path: '/inventory/products',
+              label: 'Products',
+            },
+          ],
         },
         {
           path: '/shifts',
           label: 'Shifts',
           icon: <Clock size={20} />,
         },
+        
+        // Sales & Transactions
         {
           path: '/transactions',
           label: 'Transactions',
           icon: <ShoppingCart size={20} />,
         },
+        {
+          path: '/sales-mismatches',
+          label: 'Sales Mismatches',
+          icon: <AlertTriangle size={20} />,
+        },
+        
+        // Customer Management
         {
           path: '/customers',
           label: 'Customers',
@@ -110,13 +136,20 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
           icon: <FileText size={20} />,
         },
         {
+          path: '/payment-reminders',
+          label: 'Payment Reminders',
+          icon: <Bell size={20} />,
+        },
+        
+        // Financial Management
+        {
           path: '/expenses',
           label: 'Expenses',
           icon: <DollarSign size={20} />,
         },
         {
           path: '/reports',
-          label: 'Reports',
+          label: 'Financial Reports',
           icon: <BarChart3 size={20} />,
         }
       );
@@ -131,14 +164,34 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
           path: '/sales',
           label: 'Sales',
           icon: <ShoppingCart size={20} />,
+        },
+        {
+          path: '/meter-readings',
+          label: 'Meter Readings',
+          icon: <Gauge size={20} />,
+        },
+        {
+          path: '/sales-mismatches',
+          label: 'Sales Mismatches',
+          icon: <AlertTriangle size={20} />,
         }
       );
     } else if (user.role === 'Credit Customer') {
       navItems.push(
         {
+          path: '/customer-dashboard',
+          label: 'My Dashboard',
+          icon: <LayoutDashboard size={20} />,
+        },
+        {
           path: '/invoices',
           label: 'Invoices',
           icon: <FileText size={20} />,
+        },
+        {
+          path: '/payment-reminders',
+          label: 'Payment Reminders',
+          icon: <Bell size={20} />,
         },
         {
           path: '/vehicles',
@@ -156,18 +209,38 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
     });
 
     return navItems.map((item) => (
-      <Link
-        key={item.path}
-        to={item.path}
-        className={`flex items-center gap-2 p-2 rounded-md text-sm ${
-          isActive(item.path)
-            ? 'bg-primary text-primary-foreground font-medium'
-            : 'text-muted-foreground hover:bg-muted'
-        }`}
-      >
-        {item.icon}
-        <span>{item.label}</span>
-      </Link>
+      <div key={item.path} className="mb-1">
+        <Link
+          to={item.path}
+          className={`flex items-center gap-2 p-2 rounded-md text-sm ${
+            isActive(item.path)
+              ? 'bg-primary text-primary-foreground font-medium'
+              : 'text-muted-foreground hover:bg-muted'
+          }`}
+        >
+          {item.icon}
+          <span className={isOpen ? 'block' : 'hidden md:block'}>{item.label}</span>
+        </Link>
+        
+        {item.children && isOpen && (
+          <div className="ml-8 space-y-1 mt-1">
+            {item.children.map((child) => (
+              <Link
+                key={child.path}
+                to={child.path}
+                className={`flex items-center gap-2 p-2 rounded-md text-sm ${
+                  isActive(child.path)
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full"></span>
+                <span>{child.label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     ));
   };
 
@@ -190,7 +263,7 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
       <div className="mt-auto pt-4 px-3 border-t border-border">
         <button
           onClick={logout}
-          className="flex items-center gap-2 p-2 rounded-md text-sm text-red-500 hover:bg-red-50 w-full"
+          className="flex items-center gap-2 p-2 rounded-md text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 w-full"
         >
           <LogOut size={20} />
           {isOpen && <span>Logout</span>}
@@ -201,4 +274,3 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
 };
 
 export default Sidebar;
-

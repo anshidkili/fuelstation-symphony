@@ -59,6 +59,9 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.financial_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_mismatches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_reminders ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for Super Admin
 CREATE POLICY "Super Admin can do everything on all tables" 
@@ -87,6 +90,59 @@ WITH CHECK (
     user_id = auth.uid()
 );
 
+-- Create proper policies for dispensers
+CREATE POLICY "Admins can manage dispensers at their station" 
+ON public.dispensers FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+);
+
+-- Create policies for fuel inventory and products
+CREATE POLICY "Admins can manage fuel inventory at their station" 
+ON public.fuel_inventory FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+);
+
+CREATE POLICY "Admins can manage products at their station" 
+ON public.products FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+);
+
+-- Create policies for shifts and meter readings
+CREATE POLICY "Users can manage shifts at their station" 
+ON public.shifts FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id()) OR
+    (get_user_role() = 'Employee' AND employee_id = (SELECT id FROM profiles WHERE user_id = auth.uid()))
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id()) OR
+    (get_user_role() = 'Employee' AND employee_id = (SELECT id FROM profiles WHERE user_id = auth.uid()))
+);
+
 -- Create proper policies for meter_readings
 CREATE POLICY "Admins can manage meter_readings from their station" 
 ON public.meter_readings FOR ALL 
@@ -106,6 +162,25 @@ WITH CHECK (
         FROM public.shifts s 
         WHERE s.id = shift_id
     ) = get_user_station_id())
+);
+
+-- Create policies for transactions
+CREATE POLICY "Users can manage transactions at their station" 
+ON public.transactions FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id()) OR
+    (get_user_role() = 'Employee' AND shift_id IN (
+        SELECT id FROM shifts WHERE employee_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    ))
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id()) OR
+    (get_user_role() = 'Employee' AND shift_id IN (
+        SELECT id FROM shifts WHERE employee_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    ))
 );
 
 -- Create proper policies for transaction_items
@@ -129,6 +204,51 @@ WITH CHECK (
     ) = get_user_station_id())
 );
 
+-- Create policies for vehicles
+CREATE POLICY "Admins and customers can manage vehicles" 
+ON public.vehicles FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND (
+        SELECT p.station_id 
+        FROM public.profiles p 
+        WHERE p.id = customer_id
+    ) = get_user_station_id()) OR
+    (get_user_role() = 'Credit Customer' AND customer_id = (SELECT id FROM profiles WHERE user_id = auth.uid()))
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND (
+        SELECT p.station_id 
+        FROM public.profiles p 
+        WHERE p.id = customer_id
+    ) = get_user_station_id()) OR
+    (get_user_role() = 'Credit Customer' AND customer_id = (SELECT id FROM profiles WHERE user_id = auth.uid()))
+);
+
+-- Create policies for invoices
+CREATE POLICY "Admins and customers can view invoices" 
+ON public.invoices FOR SELECT 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id()) OR
+    (get_user_role() = 'Credit Customer' AND customer_id = (SELECT id FROM profiles WHERE user_id = auth.uid()))
+);
+
+CREATE POLICY "Admins can manage invoices at their station" 
+ON public.invoices FOR INSERT UPDATE DELETE 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+);
+
 -- Create proper policies for invoice_items
 CREATE POLICY "Admins can manage invoice_items from their station" 
 ON public.invoice_items FOR ALL 
@@ -148,6 +268,101 @@ WITH CHECK (
         FROM public.invoices i 
         WHERE i.id = invoice_id
     ) = get_user_station_id())
+);
+
+-- Create policies for expenses
+CREATE POLICY "Admins can manage expenses at their station" 
+ON public.expenses FOR ALL 
+TO authenticated 
+USING (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+)
+WITH CHECK (
+    get_user_role() = 'Super Admin' OR
+    (get_user_role() = 'Admin' AND station_id = get_user_station_id())
+);
+
+-- Create policies for financial reports
+CREATE POLICY "Super Admin can see all financial reports" 
+ON public.financial_reports FOR SELECT 
+TO authenticated 
+USING (get_user_role() = 'Super Admin');
+
+CREATE POLICY "Admins can see their station financial reports" 
+ON public.financial_reports FOR SELECT 
+TO authenticated 
+USING (
+    get_user_role() = 'Admin' AND station_id = get_user_station_id()
+);
+
+-- Create policies for sales mismatches
+CREATE POLICY "Super Admin can see all sales mismatches" 
+ON public.sales_mismatches FOR ALL
+TO authenticated 
+USING (get_user_role() = 'Super Admin')
+WITH CHECK (get_user_role() = 'Super Admin');
+
+CREATE POLICY "Admins can see and manage their station's sales mismatches" 
+ON public.sales_mismatches FOR ALL
+TO authenticated 
+USING (
+    get_user_role() = 'Admin' AND 
+    (SELECT station_id FROM shifts WHERE id = shift_id) = get_user_station_id()
+)
+WITH CHECK (
+    get_user_role() = 'Admin' AND 
+    (SELECT station_id FROM shifts WHERE id = shift_id) = get_user_station_id()
+);
+
+CREATE POLICY "Employees can see their own sales mismatches" 
+ON public.sales_mismatches FOR SELECT
+TO authenticated 
+USING (
+    get_user_role() = 'Employee' AND 
+    (SELECT employee_id FROM shifts WHERE id = shift_id) = 
+    (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
+
+-- Create policies for payment reminders
+CREATE POLICY "Super Admin can manage all payment reminders" 
+ON public.payment_reminders FOR ALL
+TO authenticated 
+USING (get_user_role() = 'Super Admin')
+WITH CHECK (get_user_role() = 'Super Admin');
+
+CREATE POLICY "Admins can manage their station's payment reminders" 
+ON public.payment_reminders FOR ALL
+TO authenticated 
+USING (
+    get_user_role() = 'Admin' AND 
+    (SELECT station_id FROM invoices WHERE id = invoice_id) = get_user_station_id()
+)
+WITH CHECK (
+    get_user_role() = 'Admin' AND 
+    (SELECT station_id FROM invoices WHERE id = invoice_id) = get_user_station_id()
+);
+
+CREATE POLICY "Credit Customers can view their payment reminders" 
+ON public.payment_reminders FOR SELECT
+TO authenticated 
+USING (
+    get_user_role() = 'Credit Customer' AND customer_id = 
+    (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
+
+-- Create policies for activity logs
+CREATE POLICY "Super Admin can view all activity logs" 
+ON public.activity_logs FOR SELECT
+TO authenticated 
+USING (get_user_role() = 'Super Admin');
+
+CREATE POLICY "Admins can view their station's activity logs" 
+ON public.activity_logs FOR SELECT
+TO authenticated 
+USING (
+    get_user_role() = 'Admin' AND 
+    (details->>'station_id')::UUID = get_user_station_id()
 );
 
 -- Insert a Super Admin user for testing if no profiles exist yet
