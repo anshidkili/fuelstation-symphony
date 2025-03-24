@@ -126,8 +126,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       toast.success('Logged in successfully');
-      
-      // Use window.location instead of navigate
       window.location.href = '/';
     } catch (error: any) {
       toast.error(error.message || 'Failed to login');
@@ -145,8 +143,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setUser(null);
       toast.success('Logged out successfully');
-      
-      // Use window.location instead of navigate
       window.location.href = '/login';
     } catch (error: any) {
       toast.error(error.message || 'Failed to logout');

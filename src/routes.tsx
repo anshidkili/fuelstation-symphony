@@ -14,6 +14,9 @@ import DispenserPage from "@/pages/dispensers/DispenserPage";
 import DispenserForm from "@/pages/dispensers/DispenserForm";
 import FuelInventoryPage from "@/pages/inventory/FuelInventoryPage";
 import FuelInventoryForm from "@/pages/inventory/FuelInventoryForm";
+import ShiftsPage from "@/pages/shifts/ShiftsPage";
+import ShiftForm from "@/pages/shifts/ShiftForm";
+import MeterReadingsForm from "@/pages/shifts/MeterReadingsForm";
 
 export const router = createBrowserRouter([
   {
@@ -89,6 +92,23 @@ export const router = createBrowserRouter([
       {
         path: "/inventory/fuel/new",
         element: <FuelInventoryForm />,
+      },
+      // Shift management routes
+      {
+        path: "/shifts",
+        element: <ShiftsPage />,
+      },
+      {
+        path: "/shifts/:id",
+        element: <ShiftForm />,
+      },
+      {
+        path: "/shifts/new",
+        element: <ShiftForm />,
+      },
+      {
+        path: "/meter-readings/:shiftId",
+        element: <MeterReadingsForm />,
       },
       // Add more routes as needed
     ],
