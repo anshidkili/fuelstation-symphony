@@ -32,6 +32,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
+interface NavItem {
+  path: string;
+  label: string;
+  icon: React.ReactNode;
+  children?: { path: string; label: string }[];
+}
+
 const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -44,7 +51,7 @@ const Sidebar = ({ isOpen = true }: { isOpen?: boolean }) => {
     if (!user) return null;
 
     // Common items for all roles
-    const navItems = [
+    const navItems: NavItem[] = [
       {
         path: '/',
         label: 'Dashboard',

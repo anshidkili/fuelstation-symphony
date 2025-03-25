@@ -19,8 +19,6 @@ import ProductForm from "@/pages/inventory/ProductForm";
 import ShiftsPage from "@/pages/shifts/ShiftsPage";
 import ShiftForm from "@/pages/shifts/ShiftForm";
 import MeterReadingsForm from "@/pages/shifts/MeterReadingsForm";
-import TransactionsPage from "@/pages/transactions/TransactionsPage";
-import TransactionForm from "@/pages/transactions/TransactionForm";
 import SalesMismatchesPage from "@/pages/reports/SalesMismatchesPage";
 import SalesMismatchDetailPage from "@/pages/reports/SalesMismatchDetailPage";
 import ExpensesPage from "@/pages/expenses/ExpensesPage";
@@ -31,8 +29,6 @@ import StationComparisonsPage from "@/pages/reports/StationComparisonsPage";
 import InvoicesPage from "@/pages/invoices/InvoicesPage";
 import InvoiceForm from "@/pages/invoices/InvoiceForm";
 import InvoiceDetailPage from "@/pages/invoices/InvoiceDetailPage";
-import CustomersPage from "@/pages/customers/CustomersPage";
-import CustomerForm from "@/pages/customers/CustomerForm";
 import CustomerDashboardPage from "@/pages/customer-dashboard/CustomerDashboardPage";
 import VehiclesPage from "@/pages/vehicles/VehiclesPage";
 import VehicleForm from "@/pages/vehicles/VehicleForm";
@@ -40,6 +36,14 @@ import VehicleDetailPage from "@/pages/vehicles/VehicleDetailPage";
 import ActivityLogPage from "@/pages/admin/ActivityLogPage";
 import EmployeeSalaryPage from "@/pages/employees/EmployeeSalaryPage";
 import PaymentRemindersPage from "@/pages/invoices/PaymentRemindersPage";
+
+// Create placeholder components for missing pages
+const PlaceholderPage = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen p-4">
+    <h1 className="text-2xl font-bold mb-4">Under Construction</h1>
+    <p className="text-muted-foreground">This page is coming soon.</p>
+  </div>
+);
 
 export const router = createBrowserRouter([
   {
@@ -160,11 +164,11 @@ export const router = createBrowserRouter([
       // Transaction routes
       {
         path: "/transactions",
-        element: <TransactionsPage />,
+        element: <PlaceholderPage />,
       },
       {
         path: "/transactions/new",
-        element: <TransactionForm />,
+        element: <PlaceholderPage />,
       },
       {
         path: "/sales-mismatches",
@@ -177,15 +181,15 @@ export const router = createBrowserRouter([
       // Customer management
       {
         path: "/customers",
-        element: <CustomersPage />,
+        element: <PlaceholderPage />,
       },
       {
         path: "/customers/:id",
-        element: <CustomerForm />,
+        element: <PlaceholderPage />,
       },
       {
         path: "/customers/new",
-        element: <CustomerForm />,
+        element: <PlaceholderPage />,
       },
       // Vehicles routes
       {
