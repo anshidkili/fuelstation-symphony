@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -34,6 +33,7 @@ import { AlertTriangle, ArrowLeft, Clock, Download, Loader2, Printer } from 'luc
 import { toast } from 'sonner';
 import { calculateEmployeeSalary } from '@/services/financeService';
 import { Profile } from '@/lib/supabase';
+import { DateRange } from 'react-day-picker';
 
 interface PeriodItem {
   label: string;
@@ -45,7 +45,7 @@ export default function EmployeeSalaryPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [periods, setPeriods] = useState<PeriodItem[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current');
   const [calculating, setCalculating] = useState(false);

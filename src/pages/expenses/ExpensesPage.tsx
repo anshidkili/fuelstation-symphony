@@ -42,11 +42,12 @@ import { toast } from 'sonner';
 import { Expense } from '@/lib/supabase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { DateRange } from 'react-day-picker';
 
 export default function ExpensesPage() {
   const { user } = useAuth();
   const [stationId, setStationId] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [expenseType, setExpenseType] = useState<string | undefined>(undefined);
   const [tab, setTab] = useState('list');
 

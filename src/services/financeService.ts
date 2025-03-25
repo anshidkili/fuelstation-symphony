@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -305,7 +304,6 @@ export const generateFinancialReport = async (
   }
 };
 
-// New function to get sales mismatches
 export const getSalesMismatches = async (
   stationId: string,
   resolved?: boolean
@@ -340,7 +338,6 @@ export const getSalesMismatches = async (
   }
 };
 
-// Get a single sales mismatch by ID
 export const getSalesMismatch = async (id: string): Promise<GetSalesMismatchResult> => {
   try {
     const { data, error } = await supabase
@@ -366,7 +363,6 @@ export const getSalesMismatch = async (id: string): Promise<GetSalesMismatchResu
   }
 };
 
-// Resolve a sales mismatch
 export const resolveSalesMismatch = async (
   id: string,
   userId: string,
@@ -399,7 +395,6 @@ export const resolveSalesMismatch = async (
   }
 };
 
-// Get financial reports
 export const getFinancialReports = async (
   stationId: string, 
   reportType?: FinancialReportType,

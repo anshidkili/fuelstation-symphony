@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -39,11 +40,12 @@ import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { format } from 'date-fns';
 import { FileText, MoreVertical, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { DateRange } from 'react-day-picker';
 
 export default function InvoicesPage() {
   const { user } = useAuth();
   const [stationId, setStationId] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
 
   useEffect(() => {

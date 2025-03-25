@@ -21,12 +21,13 @@ import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { format, subMonths } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
+import { DateRange } from 'react-day-picker';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 export default function StationComparisonsPage() {
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [chartType, setChartType] = useState<string>('sales');
 
   // Set default date range to last 3 months
@@ -71,29 +72,29 @@ export default function StationComparisonsPage() {
           )
         `)
         .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
+        .lte('created_at', dateRange.to ? dateRange.to.toISOString() : new Date().toISOString());
         
       if (error) throw error;
       
       // Aggregate data by station
-      const stationSales: Record<string, { stationId: string, stationName: string, totalSales: number }> = {};
+      const stationSalesData: Record<string, { stationId: string, stationName: string, totalSales: number }> = {};
       
       data?.forEach(transaction => {
         const stationId = transaction.station_id;
         const stationName = transaction.stations?.name || 'Unknown Station';
         
-        if (!stationSales[stationId]) {
-          stationSales[stationId] = {
+        if (!stationSalesData[stationId]) {
+          stationSalesData[stationId] = {
             stationId,
             stationName,
             totalSales: 0
           };
         }
         
-        stationSales[stationId].totalSales += Number(transaction.total_amount || 0);
+        stationSalesData[stationId].totalSales += Number(transaction.total_amount || 0);
       });
       
-      return Object.values(stationSales);
+      return Object.values(stationSalesData);
     },
     enabled: !!dateRange && user?.role === UserRole.SUPER_ADMIN,
   });
@@ -120,7 +121,7 @@ export default function StationComparisonsPage() {
         `)
         .eq('transaction_items.item_type', 'fuel')
         .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
+        .lte('created_at', dateRange.to ? dateRange.to.toISOString() : new Date().toISOString());
         
       if (error) throw error;
       
@@ -131,7 +132,7 @@ export default function StationComparisonsPage() {
         const stationId = transaction.station_id;
         const stationName = transaction.stations?.name || 'Unknown Station';
         
-        if (!stationSales[stationId]) {
+        if (!stationFuel[stationId]) {
           stationFuel[stationId] = {
             stationId,
             stationName,
@@ -154,14 +155,14 @@ export default function StationComparisonsPage() {
   const getSalesChartData = () => {
     return salesData?.map(station => ({
       name: station.stationName,
-      sales: Number(station.totalSales.toFixed(2))
+      sales: Number((station.totalSales || 0).toFixed(2))
     })) || [];
   };
 
   const getFuelChartData = () => {
     return fuelData?.map(station => ({
       name: station.stationName,
-      liters: Number(station.totalLiters.toFixed(2))
+      liters: Number((station.totalLiters || 0).toFixed(2))
     })) || [];
   };
 

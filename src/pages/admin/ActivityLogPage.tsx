@@ -33,10 +33,11 @@ import { format, subDays } from 'date-fns';
 import { Activity, Eye, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ActivityLog } from '@/lib/supabase';
+import { DateRange } from 'react-day-picker';
 
 export default function ActivityLogPage() {
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [entityType, setEntityType] = useState<string | undefined>(undefined);
   const [actionType, setActionType] = useState<string | undefined>(undefined);
 

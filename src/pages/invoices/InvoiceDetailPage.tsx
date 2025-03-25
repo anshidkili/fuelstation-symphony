@@ -1,4 +1,3 @@
-
 import { useEffect, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -33,7 +32,6 @@ export default function InvoiceDetailPage() {
   const { user } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
-  // If in print mode, trigger print dialog on load
   useEffect(() => {
     if (printMode) {
       const timer = setTimeout(() => {
@@ -72,7 +70,6 @@ export default function InvoiceDetailPage() {
       
       if (result.success) {
         toast.success('Invoice marked as paid');
-        // Refresh the data
         window.location.reload();
       }
     } catch (error) {
@@ -108,11 +105,9 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  // Check if invoice is overdue
   const isOverdue = new Date(invoice.due_date) < new Date() && invoice.status !== 'paid';
   const status = isOverdue ? 'overdue' : invoice.status;
 
-  // Calculate subtotal, discount, tax and total
   const subtotal = invoice.items.reduce((sum, item) => sum + Number(item.total_price), 0);
   const discount = Number(invoice.discount);
   const tax = Number(invoice.tax);
