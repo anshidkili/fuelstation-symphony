@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -35,6 +36,10 @@ export interface SalesMismatch {
   created_at: string;
   updated_at: string;
   shifts?: {
+    start_time: string;
+    end_time?: string;
+    station_id: string;
+    dispensers: string[];
     profiles?: {
       full_name: string;
     }
@@ -312,7 +317,7 @@ export const getSalesMismatches = async (
     let query = supabase
       .from('sales_mismatches')
       .select('*, shifts(*, profiles(full_name))')
-      .eq('station_id', stationId);
+      .eq('shifts.station_id', stationId);
     
     if (resolved !== undefined) {
       query = query.eq('is_resolved', resolved);

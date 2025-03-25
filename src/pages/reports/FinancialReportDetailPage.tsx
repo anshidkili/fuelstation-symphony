@@ -24,6 +24,23 @@ import { ArrowLeft, Download, Loader2, PrinterIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+type FinancialReport = {
+  id: string;
+  station_id: string;
+  report_type: string;
+  report_date: string;
+  sales_amount: number;
+  expenses_amount: number;
+  profit_amount: number;
+  created_at: string;
+  station: {
+    id: string;
+    name: string;
+  };
+  transactions?: any[];
+  expenses?: any[];
+};
+
 export default function FinancialReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -95,7 +112,7 @@ export default function FinancialReportDetailPage() {
         ...data,
         transactions: transactionResponse.data || [],
         expenses: expenseResponse.data || []
-      };
+      } as FinancialReport;
     },
     enabled: !!id,
   });

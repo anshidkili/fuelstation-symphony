@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -229,7 +230,9 @@ export default function SalesMismatchDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Start Time</p>
                 <p className="font-medium">
-                  {format(new Date(mismatch.shifts?.start_time), 'MMM d, yyyy h:mm a')}
+                  {mismatch.shifts?.start_time ? 
+                    format(new Date(mismatch.shifts.start_time), 'MMM d, yyyy h:mm a') : 
+                    'Unknown'}
                 </p>
               </div>
               
@@ -237,7 +240,7 @@ export default function SalesMismatchDetailPage() {
                 <p className="text-sm text-muted-foreground">End Time</p>
                 <p className="font-medium">
                   {mismatch.shifts?.end_time ? 
-                    format(new Date(mismatch.shifts?.end_time), 'MMM d, yyyy h:mm a') : 
+                    format(new Date(mismatch.shifts.end_time), 'MMM d, yyyy h:mm a') : 
                     'Not Ended'}
                 </p>
               </div>
