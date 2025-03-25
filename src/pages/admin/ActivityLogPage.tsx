@@ -113,14 +113,14 @@ export default function ActivityLogPage() {
   const getActionBadgeColor = (action: string) => {
     switch (action) {
       case 'create':
-        return 'success';
+        return 'default';
       case 'update':
-        return 'info';
+        return 'secondary';
       case 'delete':
         return 'destructive';
       case 'start':
       case 'end':
-        return 'warning';
+        return 'outline';
       default:
         return 'default';
     }

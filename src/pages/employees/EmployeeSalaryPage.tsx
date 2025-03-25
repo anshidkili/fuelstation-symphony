@@ -35,12 +35,18 @@ import { toast } from 'sonner';
 import { calculateEmployeeSalary } from '@/services/financeService';
 import { Profile } from '@/lib/supabase';
 
+interface PeriodItem {
+  label: string;
+  value: string;
+  range: { from: Date; to: Date };
+}
+
 export default function EmployeeSalaryPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
-  const [periods, setPeriods] = useState<{ label: string; range: { from: Date; to: Date } }[]>([]);
+  const [periods, setPeriods] = useState<PeriodItem[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current');
   const [calculating, setCalculating] = useState(false);
   const [salary, setSalary] = useState<number | null>(null);
@@ -52,7 +58,7 @@ export default function EmployeeSalaryPage() {
     const lastDayCurrentMonth = endOfMonth(today);
     
     // Create common periods
-    const periods = [
+    const periods: PeriodItem[] = [
       {
         label: 'Current Month',
         value: 'current',

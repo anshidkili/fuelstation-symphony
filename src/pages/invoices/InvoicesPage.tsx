@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { UserRole } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -37,94 +36,82 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
-import { format, subMonths } from 'date-fns';
-import { Calendar, Eye, FileText, MoreVertical, Plus, Printer, RefreshCw } from 'lucide-react';
+import { format } from 'date-fns';
+import { FileText, MoreVertical, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { getInvoices, InvoiceStatus, updateInvoiceStatus } from '@/services/invoiceService';
 
 export default function InvoicesPage() {
   const { user } = useAuth();
   const [stationId, setStationId] = useState<string | null>(null);
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const [status, setStatus] = useState<InvoiceStatus | undefined>(undefined);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (user?.station_id) {
       setStationId(user.station_id);
     }
-    
-    if (user?.role === UserRole.CREDIT_CUSTOMER) {
-      setCustomerId(user.id);
-    }
-    
-    // Set default date range to last 3 months
-    const today = new Date();
-    const threeMonthsAgo = subMonths(today, 3);
-    setDateRange({ from: threeMonthsAgo, to: today });
   }, [user]);
 
+  // Set default date range to current month
+  useEffect(() => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    setDateRange({ from: firstDay, to: lastDay });
+  }, []);
+
   const { data: invoices, isLoading, error, refetch } = useQuery({
-    queryKey: ['invoices', stationId, customerId, status, dateRange],
+    queryKey: ['invoices', stationId, dateRange, statusFilter],
     queryFn: async () => {
-      const params: any = {};
+      if (!stationId && user?.role !== 'Credit Customer') return null;
       
-      if (stationId && user?.role !== UserRole.CREDIT_CUSTOMER) {
-        params.stationId = stationId;
-      }
-      
-      if (customerId || user?.role === UserRole.CREDIT_CUSTOMER) {
-        params.customerId = customerId || user?.id;
-      }
-      
-      if (status) {
-        params.status = status;
+      let query = supabase
+        .from('invoices')
+        .select(`
+          *,
+          customer:profiles!customer_id(id, full_name, email, contact_number)
+        `);
+        
+      if (user?.role === 'Credit Customer') {
+        query = query.eq('customer_id', user.id);
+      } else {
+        query = query.eq('station_id', stationId);
       }
       
       if (dateRange?.from) {
-        params.startDate = dateRange.from;
+        query = query.gte('issue_date', format(dateRange.from, 'yyyy-MM-dd'));
       }
       
       if (dateRange?.to) {
-        params.endDate = dateRange.to;
+        query = query.lte('issue_date', format(dateRange.to, 'yyyy-MM-dd'));
       }
       
-      const result = await getInvoices(params);
-      
-      if (!result.success) {
-        throw new Error(result.error);
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
       }
       
-      return result.invoices;
+      query = query.order('issue_date', { ascending: false });
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data;
     },
-    enabled: !!user?.role,
+    enabled: !!(stationId || user?.role === 'Credit Customer'),
   });
 
-  const handleStatusChange = async (invoiceId: string, newStatus: InvoiceStatus) => {
-    try {
-      const result = await updateInvoiceStatus(invoiceId, newStatus);
-      
-      if (result.success) {
-        refetch();
-      }
-    } catch (error) {
-      console.error('Error updating invoice status:', error);
-      toast.error('Failed to update invoice status');
-    }
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
+  // Invoice status badge
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'success';
-      case 'overdue':
-        return 'destructive';
+        return <Badge variant="outline">Paid</Badge>;
       case 'unpaid':
-        return 'warning';
-      case 'partially_paid':
-        return 'default';
+        return <Badge variant="secondary">Unpaid</Badge>;
+      case 'overdue':
+        return <Badge variant="destructive">Overdue</Badge>;
       default:
-        return 'outline';
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -139,9 +126,7 @@ export default function InvoicesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
           <p className="text-muted-foreground">
-            {user?.role === UserRole.CREDIT_CUSTOMER 
-              ? 'View and manage your invoices' 
-              : 'Create and manage invoices for customers'}
+            Manage and track all your invoices
           </p>
         </div>
         <div className="flex space-x-2">
@@ -149,14 +134,12 @@ export default function InvoicesPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          {user?.role !== UserRole.CREDIT_CUSTOMER && (
-            <Button asChild>
-              <Link to="/invoices/new">
-                <Plus className="h-4 w-4 mr-2" />
-                New Invoice
-              </Link>
-            </Button>
-          )}
+          <Button asChild>
+            <Link to="/invoices/new">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Invoice
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -164,7 +147,7 @@ export default function InvoicesPage() {
         <CardHeader>
           <CardTitle>Invoice Management</CardTitle>
           <CardDescription>
-            View, filter and manage {user?.role === UserRole.CREDIT_CUSTOMER ? 'your' : 'customer'} invoices
+            View and manage all your invoices
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -175,16 +158,16 @@ export default function InvoicesPage() {
             </div>
             <div className="w-full md:w-48">
               <label className="text-sm font-medium mb-1 block">Status</label>
-              <Select value={status} onValueChange={(value) => setStatus(value as InvoiceStatus || undefined)}>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={undefined}>All statuses</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="unpaid">Unpaid</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="partially_paid">Partially Paid</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -199,18 +182,14 @@ export default function InvoicesPage() {
               <FileText className="h-12 w-12 text-muted-foreground" />
               <div className="text-lg font-medium">No invoices found</div>
               <p className="text-muted-foreground text-center max-w-md">
-                {user?.role === UserRole.CREDIT_CUSTOMER 
-                  ? 'You have no invoices matching the selected filters.'
-                  : 'No invoices found matching the selected filters. Create a new invoice to get started.'}
+                No invoices matching the selected filters.
               </p>
-              {user?.role !== UserRole.CREDIT_CUSTOMER && (
-                <Button asChild>
-                  <Link to="/invoices/new">
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Invoice
-                  </Link>
-                </Button>
-              )}
+              <Button asChild>
+                <Link to="/invoices/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Invoice
+                </Link>
+              </Button>
             </div>
           ) : (
             <div className="rounded-md border">
@@ -218,90 +197,49 @@ export default function InvoicesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Invoice #</TableHead>
+                    <TableHead>Customer</TableHead>
                     <TableHead>Issue Date</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead>Customer</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((invoice) => {
-                    const isOverdue = new Date(invoice.due_date) < new Date() && invoice.status !== 'paid';
-                    const status = isOverdue ? 'overdue' : invoice.status;
-                    
-                    return (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                        <TableCell>{format(new Date(invoice.issue_date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>
-                          {format(new Date(invoice.due_date), 'MMM d, yyyy')}
-                          {isOverdue && invoice.status !== 'paid' && (
-                            <span className="ml-2 text-xs text-red-500">Overdue</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{invoice.customer?.full_name}</TableCell>
-                        <TableCell className="text-right">
-                          ${Number(invoice.total_amount).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(status)}>
-                            {status.replace('_', ' ')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button asChild size="sm" variant="outline">
-                              <Link to={`/invoices/${invoice.id}`}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View
-                              </Link>
+                  {invoices.map((invoice: any) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell>
+                        <Link to={`/invoices/${invoice.id}`} className="font-medium hover:underline">
+                          {invoice.invoice_number}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{invoice.customer?.full_name || 'Guest'}</TableCell>
+                      <TableCell>{format(new Date(invoice.issue_date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{format(new Date(invoice.due_date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-right font-medium">${Number(invoice.total_amount).toFixed(2)}</TableCell>
+                      <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                            
-                            {(user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN) && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuSeparator />
-                                  
-                                  <DropdownMenuItem onClick={() => window.open(`/invoices/${invoice.id}?print=true`, '_blank')}>
-                                    <Printer className="h-4 w-4 mr-2" />
-                                    Print
-                                  </DropdownMenuItem>
-                                  
-                                  <DropdownMenuSeparator />
-                                  
-                                  {invoice.status !== 'paid' && (
-                                    <DropdownMenuItem onClick={() => handleStatusChange(invoice.id, 'paid')}>
-                                      Mark as Paid
-                                    </DropdownMenuItem>
-                                  )}
-                                  
-                                  {invoice.status !== 'unpaid' && (
-                                    <DropdownMenuItem onClick={() => handleStatusChange(invoice.id, 'unpaid')}>
-                                      Mark as Unpaid
-                                    </DropdownMenuItem>
-                                  )}
-                                  
-                                  {invoice.status !== 'partially_paid' && (
-                                    <DropdownMenuItem onClick={() => handleStatusChange(invoice.id, 'partially_paid')}>
-                                      Mark as Partially Paid
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>
+                              <Link to={`/invoices/${invoice.id}`} className="w-full">
+                                View details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>Edit invoice</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Delete invoice</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>

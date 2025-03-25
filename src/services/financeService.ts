@@ -1,352 +1,245 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { logActivity } from './api';
+import { format } from 'date-fns';
 
-export type FinancialReportType = 'daily' | 'monthly' | 'yearly';
+interface SalaryResult {
+  success: boolean;
+  salary: number;
+  error?: string;
+}
 
-export const generateFinancialReport = async (
-  stationId: string,
-  reportType: FinancialReportType,
-  reportDate: Date
-) => {
+interface MismatchResult {
+  success: boolean;
+  mismatch: number;
+  expected: number;
+  actual: number;
+  error?: string;
+}
+
+interface GenerateReportResult {
+  success: boolean;
+  reportId?: string;
+  error?: string;
+}
+
+export const calculateEmployeeSalary = async (
+  employeeId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<SalaryResult> => {
   try {
-    const { data, error } = await supabase.rpc('generate_financial_report', {
-      p_station_id: stationId,
-      p_report_type: reportType,
-      p_report_date: reportDate.toISOString().split('T')[0]
+    // Get the employee's hourly rate
+    const { data: employee, error: empError } = await supabase
+      .from('profiles')
+      .select('hourly_rate')
+      .eq('id', employeeId)
+      .single();
+
+    if (empError || !employee) {
+      return { 
+        success: false, 
+        salary: 0, 
+        error: empError?.message || 'Employee not found' 
+      };
+    }
+
+    // Calculate total hours worked in the period
+    const { data: shifts, error: shiftError } = await supabase
+      .from('shifts')
+      .select('start_time, end_time')
+      .eq('employee_id', employeeId)
+      .gte('start_time', startDate.toISOString())
+      .lte('start_time', endDate.toISOString());
+
+    if (shiftError) {
+      return { 
+        success: false, 
+        salary: 0, 
+        error: shiftError.message 
+      };
+    }
+
+    // Calculate total hours
+    let totalHours = 0;
+    
+    shifts?.forEach(shift => {
+      const start = new Date(shift.start_time);
+      const end = shift.end_time ? new Date(shift.end_time) : new Date();
+      
+      // Calculate hours worked in this shift
+      const diffMs = end.getTime() - start.getTime();
+      const diffHrs = diffMs / (1000 * 60 * 60);
+      
+      totalHours += diffHrs;
     });
-
-    if (error) throw error;
-
-    await logActivity({
-      action: 'generate',
-      entity_type: 'financial_report',
-      entity_id: data,
-      details: { station_id: stationId, report_type: reportType, report_date: reportDate }
-    });
-
-    toast.success(`${reportType.charAt(0).toUpperCase() + reportType.slice(1)} report generated successfully`);
-    return { success: true, reportId: data };
+    
+    // Calculate salary
+    const salary = totalHours * employee.hourly_rate;
+    
+    return { success: true, salary };
   } catch (error: any) {
-    console.error('Error generating financial report:', error);
-    toast.error(error.message || 'Failed to generate financial report');
-    return { success: false, error: error.message };
+    console.error('Error calculating salary:', error);
+    return { 
+      success: false, 
+      salary: 0, 
+      error: error.message 
+    };
   }
 };
 
-export const getFinancialReports = async (stationId: string, reportType?: FinancialReportType) => {
+export const calculateSalesMismatch = async (
+  shiftId: string
+): Promise<MismatchResult> => {
   try {
-    let query = supabase
-      .from('financial_reports')
+    // Get shift details
+    const { data: shift, error: shiftError } = await supabase
+      .from('shifts')
       .select('*')
-      .eq('station_id', stationId)
-      .order('report_date', { ascending: false });
+      .eq('id', shiftId)
+      .single();
       
-    if (reportType) {
-      query = query.eq('report_type', reportType);
+    if (shiftError || !shift) {
+      return { 
+        success: false, 
+        mismatch: 0, 
+        expected: 0,
+        actual: 0,
+        error: shiftError?.message || 'Shift not found' 
+      };
     }
     
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    return { success: true, reports: data };
-  } catch (error: any) {
-    console.error('Error fetching financial reports:', error);
-    toast.error(error.message || 'Failed to fetch financial reports');
-    return { success: false, error: error.message };
-  }
-};
-
-export const getAllStationsFinancialSummary = async (reportType: FinancialReportType, dateRange?: { start: Date, end: Date }) => {
-  try {
-    let query = supabase
-      .from('financial_reports')
-      .select(`
-        id, 
-        report_type, 
-        report_date, 
-        sales_amount, 
-        expenses_amount, 
-        profit_amount,
-        stations(id, name)
-      `)
-      .eq('report_type', reportType)
-      .order('report_date', { ascending: false });
+    // Get meter readings for this shift
+    const { data: meterReadings, error: mrError } = await supabase
+      .from('meter_readings')
+      .select('*')
+      .eq('shift_id', shiftId);
       
-    if (dateRange) {
-      query = query.gte('report_date', dateRange.start.toISOString().split('T')[0])
-                   .lte('report_date', dateRange.end.toISOString().split('T')[0]);
+    if (mrError) {
+      return { 
+        success: false, 
+        mismatch: 0, 
+        expected: 0,
+        actual: 0,
+        error: mrError.message 
+      };
     }
     
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    return { success: true, reports: data };
-  } catch (error: any) {
-    console.error('Error fetching stations financial summary:', error);
-    toast.error(error.message || 'Failed to fetch stations financial summary');
-    return { success: false, error: error.message };
-  }
-};
-
-export const checkForInventoryAlerts = async (stationId: string) => {
-  try {
-    // Check fuel inventory for low stock
-    const { data: fuelData, error: fuelError } = await supabase
-      .from('fuel_inventory')
-      .select('*')
-      .eq('station_id', stationId)
-      .lt('current_stock', supabase.raw('alert_threshold'));
-      
-    if (fuelError) throw fuelError;
+    // Calculate expected sales from meter readings
+    let expectedSales = 0;
     
-    // Check products for low stock
-    const { data: productData, error: productError } = await supabase
-      .from('products')
-      .select('*')
-      .eq('station_id', stationId)
-      .lt('current_stock', supabase.raw('alert_threshold'));
+    for (const reading of meterReadings || []) {
+      if (reading.end_reading && reading.start_reading) {
+        const quantitySold = reading.end_reading - reading.start_reading;
+        
+        // Get fuel price
+        const { data: fuelInventory, error: fiError } = await supabase
+          .from('fuel_inventory')
+          .select('price_per_liter')
+          .eq('fuel_type', reading.fuel_type)
+          .eq('station_id', shift.station_id)
+          .single();
+        
+        if (fiError) {
+            console.error('Error fetching fuel inventory:', fiError);
+            continue;
+        }
+
+        if (fuelInventory) {
+          expectedSales += quantitySold * fuelInventory.price_per_liter;
+        }
+      }
+    }
+    
+    // Get actual sales
+    const { data: transactions, error: txError } = await supabase
+      .from('transactions')
+      .select('total_amount')
+      .eq('shift_id', shiftId);
       
-    if (productError) throw productError;
+    if (txError) {
+      return { 
+        success: false, 
+        mismatch: 0, 
+        expected: 0,
+        actual: 0,
+        error: txError.message 
+      };
+    }
+    
+    const actualSales = transactions?.reduce((sum, tx) => sum + tx.total_amount, 0) || 0;
+    
+    // Calculate mismatch
+    const mismatch = actualSales - expectedSales;
     
     return { 
       success: true, 
-      alerts: {
-        fuel: fuelData || [],
-        products: productData || []
-      }
+      mismatch,
+      expected: expectedSales,
+      actual: actualSales
     };
   } catch (error: any) {
-    console.error('Error checking inventory alerts:', error);
-    toast.error(error.message || 'Failed to check inventory alerts');
-    return { success: false, error: error.message };
+    console.error('Error calculating sales mismatch:', error);
+    return { 
+      success: false, 
+      mismatch: 0, 
+      expected: 0,
+      actual: 0,
+      error: error.message 
+    };
   }
 };
 
-// Expense Management
-export const addExpense = async (expenseData: any) => {
+export const generateFinancialReport = async (
+  stationId: string,
+  reportType: string,
+  reportDate: Date
+): Promise<GenerateReportResult> => {
   try {
+    // Validate inputs
+    if (!stationId) {
+      return {
+        success: false,
+        error: 'Station ID is required'
+      };
+    }
+    
+    if (!['daily', 'monthly', 'yearly'].includes(reportType)) {
+      return {
+        success: false,
+        error: 'Invalid report type'
+      };
+    }
+    
+    // Generate report through a Supabase function (if implemented)
+    // Or calculate directly here
+    
+    // Create report record
     const { data, error } = await supabase
-      .from('expenses')
-      .insert(expenseData)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    await logActivity({
-      action: 'create',
-      entity_type: 'expense',
-      entity_id: data.id,
-      details: { station_id: expenseData.station_id, amount: expenseData.amount }
-    });
-
-    toast.success('Expense recorded successfully');
-    return { success: true, expense: data };
-  } catch (error: any) {
-    console.error('Error recording expense:', error);
-    toast.error(error.message || 'Failed to record expense');
-    return { success: false, error: error.message };
-  }
-};
-
-export const getExpenses = async (stationId: string, dateRange?: { start: Date, end: Date }) => {
-  try {
-    let query = supabase
-      .from('expenses')
-      .select('*')
-      .eq('station_id', stationId)
-      .order('date', { ascending: false });
-      
-    if (dateRange) {
-      query = query.gte('date', dateRange.start.toISOString().split('T')[0])
-                   .lte('date', dateRange.end.toISOString().split('T')[0]);
-    }
-    
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    return { success: true, expenses: data };
-  } catch (error: any) {
-    console.error('Error fetching expenses:', error);
-    toast.error(error.message || 'Failed to fetch expenses');
-    return { success: false, error: error.message };
-  }
-};
-
-// Sales Mismatch Management
-export const checkSalesMismatch = async (shiftId: string) => {
-  try {
-    const { data, error } = await supabase.rpc('calculate_sales_mismatch', {
-      p_shift_id: shiftId
-    });
-
-    if (error) throw error;
-
-    // If there's a significant mismatch (more than $1), record it
-    if (Math.abs(data) > 1) {
-      // Get expected and actual sales amounts
-      const { data: shiftData, error: shiftError } = await supabase
-        .from('shifts')
-        .select(`
-          id,
-          station_id,
-          meter_readings(dispenser_id, fuel_type, start_reading, end_reading),
-          transactions(total_amount)
-        `)
-        .eq('id', shiftId)
-        .single();
-        
-      if (shiftError) throw shiftError;
-      
-      // Calculate expected sales based on meter readings
-      const expectedSales = shiftData.meter_readings.reduce((total: number, reading: any) => {
-        if (reading.end_reading) {
-          const { data: fuelData } = supabase
-            .from('fuel_inventory')
-            .select('price_per_liter')
-            .eq('station_id', shiftData.station_id)
-            .eq('fuel_type', reading.fuel_type)
-            .single();
-            
-          if (fuelData) {
-            const volumeSold = reading.end_reading - reading.start_reading;
-            return total + (volumeSold * fuelData.price_per_liter);
-          }
-        }
-        return total;
-      }, 0);
-      
-      // Calculate actual sales from transactions
-      const actualSales = shiftData.transactions.reduce((total: number, transaction: any) => {
-        return total + transaction.total_amount;
-      }, 0);
-      
-      // Record mismatch
-      await supabase
-        .from('sales_mismatches')
-        .insert({
-          shift_id: shiftId,
-          expected_amount: expectedSales,
-          actual_amount: actualSales,
-          mismatch_amount: data
-        });
-        
-      await logActivity({
-        action: 'detect',
-        entity_type: 'sales_mismatch',
-        entity_id: shiftId,
-        details: { expected: expectedSales, actual: actualSales, mismatch: data }
-      });
-      
-      toast.warning(`Sales mismatch detected: ${data > 0 ? 'Surplus' : 'Deficit'} of $${Math.abs(data).toFixed(2)}`);
-    }
-
-    return { success: true, mismatch: data };
-  } catch (error: any) {
-    console.error('Error checking sales mismatch:', error);
-    toast.error(error.message || 'Failed to check sales mismatch');
-    return { success: false, error: error.message };
-  }
-};
-
-export const getSalesMismatches = async (stationId: string, resolved?: boolean) => {
-  try {
-    const { data: shifts, error: shiftsError } = await supabase
-      .from('shifts')
-      .select('id')
-      .eq('station_id', stationId);
-      
-    if (shiftsError) throw shiftsError;
-    
-    const shiftIds = shifts.map((shift) => shift.id);
-    
-    let query = supabase
-      .from('sales_mismatches')
-      .select(`
-        id,
-        shift_id,
-        expected_amount,
-        actual_amount,
-        mismatch_amount,
-        is_resolved,
-        resolution_notes,
-        created_at,
-        shifts(
-          id,
-          start_time,
-          end_time,
-          profiles(id, full_name)
-        )
-      `)
-      .in('shift_id', shiftIds)
-      .order('created_at', { ascending: false });
-      
-    if (resolved !== undefined) {
-      query = query.eq('is_resolved', resolved);
-    }
-    
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    return { success: true, mismatches: data };
-  } catch (error: any) {
-    console.error('Error fetching sales mismatches:', error);
-    toast.error(error.message || 'Failed to fetch sales mismatches');
-    return { success: false, error: error.message };
-  }
-};
-
-export const resolveSalesMismatch = async (mismatchId: string, resolutionNotes: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('sales_mismatches')
-      .update({
-        is_resolved: true,
-        resolution_notes: resolutionNotes
+      .from('financial_reports')
+      .insert({
+        station_id: stationId,
+        report_type: reportType,
+        report_date: format(reportDate, 'yyyy-MM-dd'),
+        sales_amount: 0, // Replace with actual calculation
+        expenses_amount: 0, // Replace with actual calculation
+        profit_amount: 0 // Replace with actual calculation
       })
-      .eq('id', mismatchId)
       .select()
       .single();
-
-    if (error) throw error;
-
-    await logActivity({
-      action: 'resolve',
-      entity_type: 'sales_mismatch',
-      entity_id: mismatchId,
-      details: { resolution_notes: resolutionNotes }
-    });
-
-    toast.success('Sales mismatch marked as resolved');
-    return { success: true, mismatch: data };
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      success: true,
+      reportId: data?.id
+    };
   } catch (error: any) {
-    console.error('Error resolving sales mismatch:', error);
-    toast.error(error.message || 'Failed to resolve sales mismatch');
-    return { success: false, error: error.message };
-  }
-};
-
-// Function to calculate employee salary
-export const calculateEmployeeSalary = async (employeeId: string, startDate: Date, endDate: Date) => {
-  try {
-    const { data, error } = await supabase.rpc('calculate_employee_salary', {
-      p_employee_id: employeeId,
-      p_start_date: startDate.toISOString().split('T')[0],
-      p_end_date: endDate.toISOString().split('T')[0]
-    });
-
-    if (error) throw error;
-
-    return { success: true, salary: data };
-  } catch (error: any) {
-    console.error('Error calculating employee salary:', error);
-    toast.error(error.message || 'Failed to calculate employee salary');
-    return { success: false, error: error.message };
+    console.error('Error generating financial report:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 };

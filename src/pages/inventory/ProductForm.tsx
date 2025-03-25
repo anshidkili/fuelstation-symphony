@@ -109,7 +109,14 @@ export default function ProductForm() {
       if (isEditing && id) {
         const { error } = await supabase
           .from('products')
-          .update(data)
+          .update({
+            name: data.name,
+            category: data.category,
+            current_stock: data.current_stock,
+            alert_threshold: data.alert_threshold,
+            price: data.price,
+            cost: data.cost
+          })
           .eq('id', id);
           
         if (error) throw error;
@@ -119,7 +126,12 @@ export default function ProductForm() {
         const { error } = await supabase
           .from('products')
           .insert({
-            ...data,
+            name: data.name,
+            category: data.category,
+            current_stock: data.current_stock,
+            alert_threshold: data.alert_threshold,
+            price: data.price,
+            cost: data.cost,
             station_id: user.station_id,
           });
           
