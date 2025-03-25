@@ -1,6 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 
 interface SalaryResult {
   success: boolean;
@@ -19,6 +21,68 @@ interface MismatchResult {
 interface GenerateReportResult {
   success: boolean;
   reportId?: string;
+  error?: string;
+}
+
+export interface SalesMismatch {
+  id: string;
+  shift_id: string;
+  expected_amount: number;
+  actual_amount: number;
+  mismatch_amount: number;
+  is_resolved: boolean;
+  resolution_note?: string;
+  resolved_by?: string;
+  created_at: string;
+  updated_at: string;
+  shifts?: {
+    profiles?: {
+      full_name: string;
+    }
+  }
+}
+
+export interface GetSalesMismatchesResult {
+  success: boolean;
+  mismatches: SalesMismatch[];
+  error?: string;
+}
+
+export interface GetSalesMismatchResult {
+  success: boolean;
+  mismatch?: SalesMismatch;
+  error?: string;
+}
+
+export interface ResolveMismatchResult {
+  success: boolean;
+  error?: string;
+}
+
+export enum FinancialReportType {
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
+  YEARLY = 'yearly'
+}
+
+export interface FinancialReport {
+  id: string;
+  station_id: string;
+  report_type: string;
+  report_date: string;
+  sales_amount: number;
+  expenses_amount: number;
+  profit_amount: number;
+  created_at: string;
+  stations?: {
+    name: string;
+  }
+}
+
+export interface GetFinancialReportsResult {
+  success: boolean;
+  reports: FinancialReport[];
   error?: string;
 }
 
@@ -210,9 +274,6 @@ export const generateFinancialReport = async (
       };
     }
     
-    // Generate report through a Supabase function (if implemented)
-    // Or calculate directly here
-    
     // Create report record
     const { data, error } = await supabase
       .from('financial_reports')
@@ -240,6 +301,144 @@ export const generateFinancialReport = async (
     return { 
       success: false, 
       error: error.message 
+    };
+  }
+};
+
+// New function to get sales mismatches
+export const getSalesMismatches = async (
+  stationId: string,
+  resolved?: boolean
+): Promise<GetSalesMismatchesResult> => {
+  try {
+    let query = supabase
+      .from('sales_mismatches')
+      .select('*, shifts(*, profiles(full_name))')
+      .eq('station_id', stationId);
+    
+    if (resolved !== undefined) {
+      query = query.eq('is_resolved', resolved);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      success: true,
+      mismatches: data || []
+    };
+  } catch (error: any) {
+    console.error('Error fetching sales mismatches:', error);
+    return {
+      success: false,
+      mismatches: [],
+      error: error.message
+    };
+  }
+};
+
+// Get a single sales mismatch by ID
+export const getSalesMismatch = async (id: string): Promise<GetSalesMismatchResult> => {
+  try {
+    const { data, error } = await supabase
+      .from('sales_mismatches')
+      .select('*, shifts(*, profiles(full_name))')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      success: true,
+      mismatch: data
+    };
+  } catch (error: any) {
+    console.error('Error fetching sales mismatch:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Resolve a sales mismatch
+export const resolveSalesMismatch = async (
+  id: string,
+  userId: string,
+  resolutionNote: string
+): Promise<ResolveMismatchResult> => {
+  try {
+    const { error } = await supabase
+      .from('sales_mismatches')
+      .update({
+        is_resolved: true,
+        resolution_note: resolutionNote,
+        resolved_by: userId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      success: true
+    };
+  } catch (error: any) {
+    console.error('Error resolving sales mismatch:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Get financial reports
+export const getFinancialReports = async (
+  stationId: string, 
+  reportType?: FinancialReportType,
+  dateRange?: DateRange
+): Promise<GetFinancialReportsResult> => {
+  try {
+    let query = supabase
+      .from('financial_reports')
+      .select('*, stations(name)')
+      .eq('station_id', stationId);
+    
+    if (reportType) {
+      query = query.eq('report_type', reportType);
+    }
+    
+    if (dateRange?.from) {
+      query = query.gte('report_date', format(dateRange.from, 'yyyy-MM-dd'));
+      
+      if (dateRange.to) {
+        query = query.lte('report_date', format(dateRange.to, 'yyyy-MM-dd'));
+      }
+    }
+    
+    const { data, error } = await query.order('report_date', { ascending: false });
+    
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      success: true,
+      reports: data || []
+    };
+  } catch (error: any) {
+    console.error('Error fetching financial reports:', error);
+    return {
+      success: false,
+      reports: [],
+      error: error.message
     };
   }
 };

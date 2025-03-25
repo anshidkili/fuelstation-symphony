@@ -1,17 +1,17 @@
 
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { UserRole } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import {
   Table,
@@ -23,126 +23,123 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO } from 'date-fns';
-import { AlertTriangle, ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { resolveSalesMismatch } from '@/services/financeService';
+import { getSalesMismatch, resolveSalesMismatch } from '@/services/financeService';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function SalesMismatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [resolutionNotes, setResolutionNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState('');
 
-  const { data: mismatch, isLoading, error } = useQuery({
+  const {
+    data: mismatch,
+    isLoading,
+    error,
+    refetch
+  } = useQuery({
     queryKey: ['sales-mismatch', id],
     queryFn: async () => {
       if (!id) return null;
       
-      const { data, error } = await supabase
-        .from('sales_mismatches')
-        .select(`
-          *,
-          shift:shifts(
-            id,
-            start_time,
-            end_time,
-            employee:profiles(
-              id,
-              full_name
-            ),
-            station:stations(
-              id,
-              name
-            ),
-            meter_readings(
-              id,
-              dispenser_id,
-              fuel_type,
-              start_reading,
-              end_reading,
-              dispenser:dispensers(
-                id,
-                name
-              )
-            )
-          ),
-          transactions:transactions(
-            id,
-            total_amount,
-            payment_method,
-            created_at
-          )
-        `)
-        .eq('id', id)
-        .single();
-        
-      if (error) throw error;
+      const result = await getSalesMismatch(id);
       
-      // Get transaction details
-      if (data.shift && data.shift.id) {
-        const { data: transactionData, error: transactionError } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('shift_id', data.shift.id);
-          
-        if (transactionError) throw transactionError;
-        
-        return {
-          ...data,
-          transactions: transactionData
-        };
+      if (!result.success) {
+        throw new Error(result.error);
       }
       
-      return data;
+      return result.mismatch;
     },
     enabled: !!id,
   });
 
-  const resolveMismatchMutation = useMutation({
-    mutationFn: async () => {
-      if (!id) throw new Error('No mismatch ID provided');
-      if (!resolutionNotes.trim()) throw new Error('Resolution notes are required');
+  // Get transactions for this shift
+  const { data: transactions } = useQuery({
+    queryKey: ['shift-transactions', mismatch?.shift_id],
+    queryFn: async () => {
+      if (!mismatch?.shift_id) return [];
       
-      return await resolveSalesMismatch(id, resolutionNotes);
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('shift_id', mismatch.shift_id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data || [];
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sales-mismatch', id] });
-      queryClient.invalidateQueries({ queryKey: ['sales-mismatches'] });
-      toast.success('Sales mismatch resolved successfully');
-    },
-    onError: (error: any) => {
-      console.error('Error resolving sales mismatch:', error);
-      toast.error(error.message || 'Failed to resolve sales mismatch');
-    }
+    enabled: !!mismatch?.shift_id,
   });
 
-  const handleResolveMismatch = async () => {
-    if (!resolutionNotes.trim()) {
-      toast.error('Please provide resolution notes');
+  // Get meter readings for this shift
+  const { data: meterReadings } = useQuery({
+    queryKey: ['shift-meter-readings', mismatch?.shift_id],
+    queryFn: async () => {
+      if (!mismatch?.shift_id) return [];
+      
+      const { data, error } = await supabase
+        .from('meter_readings')
+        .select('*, dispensers(name, fuel_type)')
+        .eq('shift_id', mismatch.shift_id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      return data || [];
+    },
+    enabled: !!mismatch?.shift_id,
+  });
+
+  // Handle error
+  if (error) {
+    toast.error('Failed to load sales mismatch details');
+    console.error('Error loading sales mismatch:', error);
+  }
+
+  // Access control - only Admin and Employee should see this
+  if (user?.role !== UserRole.ADMIN && user?.role !== UserRole.EMPLOYEE) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen space-y-4">
+        <div className="text-2xl font-bold">Access Denied</div>
+        <p className="text-muted-foreground text-center max-w-md">
+          You don't have permission to access the sales mismatch details.
+        </p>
+      </div>
+    );
+  }
+
+  const handleResolve = async () => {
+    if (!id || !user || !resolutionNote.trim()) {
+      toast.error('Please enter a resolution note');
       return;
     }
     
-    setIsSubmitting(true);
+    const result = await resolveSalesMismatch(id, user.id, resolutionNote);
     
-    try {
-      await resolveMismatchMutation.mutateAsync();
-    } finally {
-      setIsSubmitting(false);
+    if (result.success) {
+      toast.success('Sales mismatch resolved successfully');
+      refetch();
+    } else {
+      toast.error(`Failed to resolve mismatch: ${result.error}`);
     }
   };
 
-  if (error) {
-    toast.error('Failed to load sales mismatch details');
-    console.error('Error loading sales mismatch details:', error);
-  }
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(value);
+  };
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -150,279 +147,220 @@ export default function SalesMismatchDetailPage() {
   if (!mismatch) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="text-lg font-medium">Mismatch not found</div>
-        <p className="text-muted-foreground text-center max-w-md">
-          The requested sales mismatch record could not be found.
-        </p>
-        <Button onClick={() => navigate('/sales-mismatches')}>
-          Back to Mismatches
+        <div className="text-lg font-medium">Sales mismatch not found</div>
+        <Button variant="outline" onClick={() => navigate('/sales-mismatches')}>
+          Back to Sales Mismatches
         </Button>
       </div>
     );
   }
 
-  const difference = Number(mismatch.mismatch_amount);
-  const isPositive = difference > 0;
-
+  const isPositive = mismatch.mismatch_amount > 0;
+  
   return (
     <div className="space-y-6">
-      <div className="flex items-center">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/sales-mismatches')}
-          className="mr-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Mismatch Details</h1>
           <p className="text-muted-foreground">
-            {format(parseISO(mismatch.created_at), 'MMMM d, yyyy')} - {mismatch.shift?.employee?.full_name}
+            Review and resolve discrepancies between expected and actual sales
           </p>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => navigate('/sales-mismatches')}>
+            Back to Sales Mismatches
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="md:col-span-2">
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Mismatch Summary</span>
-              <Badge variant={mismatch.is_resolved ? 'outline' : 'destructive'}>
-                {mismatch.is_resolved ? 'Resolved' : 'Unresolved'}
-              </Badge>
-            </CardTitle>
+            <CardTitle>Mismatch Summary</CardTitle>
+            <CardDescription>
+              Overview of the sales discrepancy
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">Expected Sales</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">${Number(mismatch.expected_amount).toFixed(2)}</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">Actual Sales</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">${Number(mismatch.actual_amount).toFixed(2)}</p>
-                </CardContent>
-              </Card>
-              
-              <Card className={isPositive ? 'border-emerald-200 dark:border-emerald-800' : 'border-red-200 dark:border-red-800'}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">Difference</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {isPositive ? '+' : ''}{difference.toFixed(2)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {isPositive ? 'Surplus' : 'Deficit'}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
-              <h3 className="font-medium mb-2">Shift Information</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Employee</p>
-                  <p className="font-medium">{mismatch.shift?.employee?.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Station</p>
-                  <p className="font-medium">{mismatch.shift?.station?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Shift Start</p>
-                  <p className="font-medium">
-                    {format(parseISO(mismatch.shift?.start_time), 'MMM d, yyyy h:mm a')}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Shift End</p>
-                  <p className="font-medium">
-                    {mismatch.shift?.end_time 
-                      ? format(parseISO(mismatch.shift.end_time), 'MMM d, yyyy h:mm a')
-                      : 'Not ended'}
-                  </p>
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Date</p>
+                <p className="text-lg">{format(new Date(mismatch.created_at), 'MMM d, yyyy')}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <Badge className="mt-1" variant={mismatch.is_resolved ? 'outline' : 'destructive'}>
+                  {mismatch.is_resolved ? 'Resolved' : 'Unresolved'}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Attendant</p>
+                <p className="text-lg">{mismatch.shifts?.profiles?.full_name || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Shift ID</p>
+                <p className="text-lg font-mono text-xs">{mismatch.shift_id}</p>
               </div>
             </div>
-            
-            {mismatch.is_resolved && (
-              <div className={`p-4 rounded-md bg-muted`}>
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium mb-1">Resolution Notes</h3>
-                    <p className="text-muted-foreground">{mismatch.resolution_notes}</p>
-                  </div>
+
+            <div className="pt-4 border-t">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Expected Amount</p>
+                  <p className="text-xl font-semibold">{formatCurrency(mismatch.expected_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Actual Amount</p>
+                  <p className="text-xl font-semibold">{formatCurrency(mismatch.actual_amount)}</p>
                 </div>
               </div>
-            )}
+              
+              <div className="mt-6 p-4 rounded-md bg-muted">
+                <p className="text-sm font-medium text-muted-foreground">Difference</p>
+                <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {isPositive ? '+' : ''}{formatCurrency(mismatch.mismatch_amount)}
+                  <span className="text-sm font-normal ml-2">
+                    {isPositive ? '(Surplus)' : '(Deficit)'}
+                  </span>
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-        
-        {!mismatch.is_resolved && (
+
+        {mismatch.is_resolved ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Resolution Details</CardTitle>
+              <CardDescription>
+                This mismatch has been resolved
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Resolved By</p>
+                <p className="text-lg">{mismatch.resolved_by || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Resolution Date</p>
+                <p className="text-lg">{format(new Date(mismatch.updated_at), 'MMM d, yyyy')}</p>
+              </div>
+              <div className="pt-4">
+                <p className="text-sm font-medium text-muted-foreground">Resolution Note</p>
+                <div className="mt-2 p-3 rounded-md bg-muted">
+                  <p className="whitespace-pre-wrap">{mismatch.resolution_note || 'No notes provided'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
           <Card>
             <CardHeader>
               <CardTitle>Resolve Mismatch</CardTitle>
               <CardDescription>
-                Provide an explanation for this discrepancy
+                Provide details about why this mismatch occurred
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="Enter resolution notes here..."
-                className="resize-none h-32"
-                value={resolutionNotes}
-                onChange={(e) => setResolutionNotes(e.target.value)}
+                placeholder="Enter explanation and resolution details..."
+                className="min-h-[150px]"
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
               />
             </CardContent>
-            <CardFooter className="flex justify-end">
+            <CardFooter>
               <Button 
-                onClick={handleResolveMismatch} 
-                disabled={!resolutionNotes.trim() || isSubmitting}
+                onClick={handleResolve} 
+                disabled={!resolutionNote.trim()}
+                className="w-full"
               >
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Mark as Resolved
               </Button>
             </CardFooter>
           </Card>
         )}
-        
-        {mismatch.is_resolved && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Resolution Status</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center text-center p-6">
-              <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-              <h3 className="text-xl font-medium mb-2">Mismatch Resolved</h3>
-              <p className="text-muted-foreground mb-4">
-                This sales mismatch has been resolved and no further action is required.
-              </p>
-            </CardContent>
-          </Card>
-        )}
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Meter Readings</CardTitle>
             <CardDescription>
-              Fuel dispensed during the shift
+              Dispenser readings for this shift
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!mismatch.shift?.meter_readings || mismatch.shift.meter_readings.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No meter readings recorded for this shift.
-              </div>
-            ) : (
+            {meterReadings && meterReadings.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Dispenser</TableHead>
                     <TableHead>Fuel Type</TableHead>
-                    <TableHead className="text-right">Start Reading</TableHead>
-                    <TableHead className="text-right">End Reading</TableHead>
-                    <TableHead className="text-right">Volume (L)</TableHead>
+                    <TableHead>Start</TableHead>
+                    <TableHead>End</TableHead>
+                    <TableHead>Volume</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mismatch.shift.meter_readings.map((reading: any) => {
-                    const volume = reading.end_reading && reading.start_reading 
-                      ? reading.end_reading - reading.start_reading 
-                      : null;
-                      
-                    return (
-                      <TableRow key={reading.id}>
-                        <TableCell>{reading.dispenser?.name || `Dispenser ${reading.dispenser_id}`}</TableCell>
-                        <TableCell className="capitalize">{reading.fuel_type}</TableCell>
-                        <TableCell className="text-right">{reading.start_reading}</TableCell>
-                        <TableCell className="text-right">{reading.end_reading || 'Not recorded'}</TableCell>
-                        <TableCell className="text-right">
-                          {volume !== null ? volume.toFixed(2) : '-'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Transactions</CardTitle>
-            <CardDescription>
-              Sales recorded during the shift
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!mismatch.transactions || mismatch.transactions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions recorded for this shift.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mismatch.transactions.map((transaction: any) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell>{format(parseISO(transaction.created_at), 'h:mm a')}</TableCell>
-                      <TableCell className="capitalize">{transaction.payment_method}</TableCell>
-                      <TableCell className="text-right">${Number(transaction.total_amount).toFixed(2)}</TableCell>
+                  {meterReadings.map((reading) => (
+                    <TableRow key={reading.id}>
+                      <TableCell>{reading.dispensers?.name || 'Unknown'}</TableCell>
+                      <TableCell>{reading.dispensers?.fuel_type || 'Unknown'}</TableCell>
+                      <TableCell>{reading.start_reading}</TableCell>
+                      <TableCell>{reading.end_reading}</TableCell>
+                      <TableCell>
+                        {(reading.end_reading - reading.start_reading).toFixed(2)} L
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                No meter readings found for this shift
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Transactions</CardTitle>
+            <CardDescription>
+              Sales transactions during this shift
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {transactions && transactions.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell>{format(new Date(tx.created_at), 'HH:mm')}</TableCell>
+                      <TableCell>{tx.transaction_type}</TableCell>
+                      <TableCell>{tx.payment_method}</TableCell>
+                      <TableCell>{formatCurrency(tx.total_amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                No transactions found for this shift
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
-      
-      {isPositive && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-md flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="font-medium text-amber-800 dark:text-amber-300 mb-1">Cash Surplus Detected</h3>
-            <p className="text-amber-700 dark:text-amber-400">
-              The actual sales amount exceeds the expected amount by ${Math.abs(difference).toFixed(2)}. 
-              This could be due to over-payment, errors in transaction recording, or incorrect meter readings.
-            </p>
-          </div>
-        </div>
-      )}
-      
-      {!isPositive && difference !== 0 && (
-        <div className="bg-red-50 dark:bg-red-950/30 p-4 rounded-md flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="font-medium text-red-800 dark:text-red-300 mb-1">Cash Deficit Detected</h3>
-            <p className="text-red-700 dark:text-red-400">
-              The actual sales amount is less than the expected amount by ${Math.abs(difference).toFixed(2)}. 
-              This could be due to under-payment, errors in transaction recording, or incorrect meter readings.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
